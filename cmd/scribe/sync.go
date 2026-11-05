@@ -26,16 +26,27 @@ type SyncCmd struct {
 	DiscoverOnly bool   `help:"Only discover new projects." name:"discover"`
 	Extract      string `help:"Extract one specific project." name:"extract"`
 	Changed      string `help:"Show changed files for a project." name:"changed"`
-	Max          int    `help:"Max projects to extract per run." default:"3"`
+	Max          int    `help:"Max projects to extract per run (0 uses sync.max_extractions)." default:"0"`
 	MaxAbsorb    int    `help:"Override scribe.yaml absorb.max_per_run for this run (0 = use config default)." name:"max-absorb" default:"0"`
 	Model        string `help:"Claude model to use." default:"sonnet"`
 	Sessions     bool   `help:"Mine coding-agent sessions from ccrider."`
-	SessionsMax  int    `help:"Max normal sessions per run; large sessions (>300 msgs) get an extra max(1,N/3) slot on top." name:"sessions-max" default:"3"`
+	SessionsMax  int    `help:"Max normal sessions per run (0 uses sync.max_sessions); large sessions (>300 msgs) get an extra max(1,N/3) slot on top." name:"sessions-max" default:"0"`
 	SessionSort  string `help:"Session sort: score (highest first, default) or date (newest first)." name:"session-sort" default:"score" enum:"date,score"`
 	SkipLarge    bool   `help:"Skip large sessions (>300 messages)." name:"skip-large"`
-	Parallel     int    `help:"Max concurrent project extractions (1-5)." default:"3"`
+	Parallel     int    `help:"Max concurrent project extractions and normal sessions (1-5; 0 uses sync.parallel_extractions)." default:"0"`
 	Research     bool   `help:"Collect .claude/research/ files from tracked projects." default:"true" negatable:""`
 	Estimate     bool   `help:"With --dry-run, print a token-count estimate for the queued work. Use to sanity-check scope before a real sync."`
+}
+
+func (s *SyncCmd) parallelism(cfg *ScribeConfig) int {
+	workers := s.Parallel
+	if workers == 0 {
+		workers = cfg.Sync.ParallelExtractions
+	}
+	if workers == 0 {
+		workers = 3
+	}
+	return min(max(workers, 1), 5)
 }
 
 // Counters for the sync run summary.
@@ -55,6 +66,12 @@ func (s *SyncCmd) Run() error {
 	cfg := loadConfig(root)
 	if err := cfg.requireParseable(); err != nil {
 		return err
+	}
+	if s.Max == 0 {
+		s.Max = cfg.Sync.MaxExtractions
+	}
+	if s.SessionsMax == 0 {
+		s.SessionsMax = cfg.Sync.MaxSessions
 	}
 
 	manifest, err := loadManifest(root)

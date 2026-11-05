@@ -1040,7 +1040,7 @@ func (s *SyncCmd) mineSessions(root string) (int, error) {
 
 	if len(normalIDs) > 0 {
 		logMsg("sync", "priority lanes found %d normal sessions (<=300 msgs)", len(normalIDs))
-		mined, rateLimited := s.mineSessionBatches(root, normalIDs, cfg.Sync.ParallelExtractions, 10*time.Minute, "session-extract.md", "session")
+		mined, rateLimited := s.mineSessionBatches(root, normalIDs, s.parallelism(cfg), 10*time.Minute, "session-extract.md", "session")
 		totalMined += mined
 		if rateLimited {
 			logMsg("sync", "rate limited during normal session mining — skipping large sessions")

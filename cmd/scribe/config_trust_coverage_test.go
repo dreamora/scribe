@@ -57,6 +57,8 @@ var nonSensitiveAllowlist = map[string]bool{
 	// where data goes, or any gate.
 	"LLM.NumCtx":  true,
 	"LLM.Pricing": true,
+	// Reasoning effort changes compute use, not inputs, routing, or gates.
+	"LLM.CodexReasoningEffort": true,
 
 	// Sync pipeline caps + git cadence.
 	"Sync.MaxExtractions":                   true,
