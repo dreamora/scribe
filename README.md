@@ -1,5 +1,59 @@
 # scribe
 
+## Dreamora fork
+
+Use branch `codex-sync` for the Codex CLI provider and shared sync worker limits.
+This branch extends upstream `v0.5.10`.
+
+Authenticate with `codex login`, then add these settings to your KB's `scribe.yaml`:
+
+```yaml
+llm:
+  codex_reasoning_effort: medium
+extract:
+  provider: codex
+  model: gpt-6.1-terra
+session_mine:
+  provider: codex
+  model: gpt-6.1-terra
+sync:
+  max_extractions: 5
+  max_sessions: 5
+  parallel_extractions: 5
+```
+
+Merge these keys into existing blocks. Other operations retain their configured
+providers. The Codex provider uses envelope mode: Go writes the KB, and Codex
+receives the prompt through stdin with agent tools disabled.
+
+Build with Go and a C toolchain:
+
+```sh
+git clone --branch codex-sync https://github.com/dreamora/scribe.git
+cd scribe
+make build VERSION=0.5.10-codex.1
+./bin/scribe version
+```
+
+The version command prints `scribe 0.5.10-codex.1`.
+Run `./bin/scribe sync` or `./bin/scribe sync --sessions` to use the configuration.
+Zero values for `--parallel`, `--max`, and `--sessions-max` inherit the corresponding
+`sync` settings. Explicit `--parallel` values control project extraction and normal
+session mining, with a maximum of five workers. Large sessions remain serial.
+
+Run `make check` for tests and vet. The live Codex test is opt-in:
+
+```sh
+CODEX_HOME="$HOME/.codex" go test -tags sqlite_fts5 ./cmd/scribe \
+  -run '^TestCodexLiveParallel$' -count=1 -v -args -codex-live-test
+```
+
+The live test sends five simultaneous requests to `gpt-6.1-terra` at medium effort.
+Keep the signed Homebrew executable for iMessage capture when using an unsigned
+local build; replacing that executable can require a new Full Disk Access grant.
+
+## Upstream Scribe
+
 `scribe` is a single-binary CLI that creates and maintains a personal, LLM-written knowledge base. It continuously extracts reusable knowledge from your git repos, coding-agent sessions indexed by [`ccrider`](https://github.com/neilberkman/ccrider) (Claude Code, Codex CLI, GitHub Copilot CLI, OpenCode, Pi, Antigravity, and Amp when imported by ccrider), links you iMessage to yourself as bookmarks (your own number is the world's most portable read-it-later list), and local files, then compiles it into a curated wiki that [`qmd`](https://github.com/tobi/qmd) indexes for semantic search. Every LLM step resolves through one top-level `llm:` provider block: Anthropic's Claude by default, or a 100% local [Ollama](https://ollama.com) server (qwen3 / gemma4 / gemma3, $0 API cost) — flipping the whole pipeline to free/offline is one line of yaml.
 
 **Not a second brain.** scribe writes a personal *context corpus* — durable LLM memory that survives session boundaries and crosses projects. You almost never read the KB directly; Claude Code and Codex do, every session. The human is at the end of the pipeline, consuming an answer, not navigating a graph. The corpus is plain markdown in git, so it outlives the pipeline that wrote it — if scribe disappears tomorrow, the KB is still yours.

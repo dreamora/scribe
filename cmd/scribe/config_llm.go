@@ -13,7 +13,8 @@ import (
 // is `llm.provider: ollama` plus a pre-pulled model — no per-op edits
 // needed.
 type LLMConfig struct {
-	// Provider is "anthropic" (default) or "ollama". Unknown values
+	// Provider supports anthropic (default), ollama, codex, and hosted
+	// OpenAI-compatible providers. Unknown values
 	// fall back to anthropic with a log line (see newLLMProvider).
 	Provider string `yaml:"provider"`
 	// Model is the default model name used when a per-op Model is
@@ -24,6 +25,9 @@ type LLMConfig struct {
 	// local default when the user picks ollama but leaves model
 	// blank.
 	Model string `yaml:"model"`
+	// CodexReasoningEffort is passed to codex exec for provider=codex.
+	// Empty uses medium. Per-op provider/model fields still select routing.
+	CodexReasoningEffort string `yaml:"codex_reasoning_effort"`
 	// OllamaURL points at the Ollama HTTP server. Default
 	// http://localhost:11434. Per-op overrides survive (e.g. the
 	// existing Absorb.Contextualize.OllamaURL); when both are unset

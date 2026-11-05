@@ -31,8 +31,8 @@ func exceedsExtractFileCap(cfg *ScribeConfig, changedCount int) bool {
 }
 
 // extract processes projects that need extraction.
-// Projects run concurrently up to s.Parallel (default 3, capped at 5 to
-// avoid Anthropic rate limits). A rate-limit error cancels pending work
+// Projects use the CLI/config worker limit, capped at 5.
+// A rate-limit error cancels pending work
 // via the errgroup context; already-running extractions finish naturally.
 func (s *SyncCmd) extract(root string, manifest *Manifest) (int, error) {
 	cfg := loadConfig(root)
@@ -54,7 +54,7 @@ func (s *SyncCmd) extract(root string, manifest *Manifest) (int, error) {
 		toExtract = toExtract[:s.Max]
 	}
 
-	parallel := min(max(s.Parallel, 1), 5, len(toExtract))
+	parallel := min(s.parallelism(cfg), len(toExtract))
 
 	if parallel > 1 {
 		logMsg("sync", "extracting %d projects (parallel=%d)", len(toExtract), parallel)

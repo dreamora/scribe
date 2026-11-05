@@ -87,7 +87,7 @@ var newLLMProvider = realNewLLMProvider
 // realNewLLMProvider is the production implementation behind the
 // newLLMProvider seam. Recognized hosted OpenAI-compatible providers
 // (together/groq/fireworks/huggingface/openai-compat) route to
-// openaiCompatProvider; any other unknown name falls back to anthropic
+// openaiCompatProvider; codex uses the authenticated CLI. Unknown names fall back to anthropic
 // with a log line so misconfiguration never silently no-ops.
 //
 // kbRoot is forwarded to every provider so its calls can land in
@@ -97,6 +97,12 @@ var newLLMProvider = realNewLLMProvider
 // keep working.
 func realNewLLMProvider(provider, model, ollamaURL, kbRoot string) llmProviderGenerator {
 	switch strings.ToLower(provider) {
+	case "codex":
+		effort := "medium"
+		if cfg := loadConfig(kbRoot); cfg != nil && cfg.LLM.CodexReasoningEffort != "" {
+			effort = cfg.LLM.CodexReasoningEffort
+		}
+		return &codexProvider{model: model, effort: effort, root: kbRoot}
 	case "ollama":
 		return &ollamaProvider{baseURL: ollamaURL, model: model, root: kbRoot}
 	case "anthropic", "":
