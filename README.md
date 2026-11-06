@@ -41,11 +41,13 @@ Zero values for `--parallel`, `--max`, and `--sessions-max` inherit the correspo
 `sync` settings. Explicit `--parallel` values control project extraction and normal
 envelope-mode session mining, with a maximum of five workers. Tools-mode sessions and large sessions remain serial.
 
-Normal tools-mode mining validates changed rolling files before recording a session as processed.
+Normal and large tools-mode mining validate changed rolling files before recording a session as processed.
 It rejects nested directory aliases and Markdown symlinks in KB content directories before launching the model process.
-It can fill missing metadata in `projects/<project>/learnings.md` from dated entries and explicit session references.
+It fills missing metadata in standard and configured rolling targets under `projects/`, their yearly archives, and files marked `rolling: true` in KB content directories.
+It derives missing dates from dated entries and missing sources from explicit session references. It reports unresolved dates instead of inventing them.
 It preserves valid metadata and body bytes during repair. Unrecoverable output restores the session's rolling files and leaves the session pending.
-If restoration fails, sync stops before later mining or commits. Large-session enforcement and bulk repair remain planned.
+Untouched invalid regular files do not block mining. Malformed rolling metadata, explicit false markers on named targets, and invalid existing values require manual correction.
+If restoration fails, sync stops before later mining or commits. Envelope-mode enforcement and bulk repair remain planned.
 Restoration rejects symlink parent directories below the selected KB root, including in-KB links, before writes or removals.
 Configured KB-root aliases remain supported.
 

@@ -468,7 +468,7 @@ func (s *SyncCmd) mineSessionBatches(root string, sessionIDs []string, parallel 
 	return s.mineSessionsSerial(root, sessionIDs, timeout, promptName, label, tools, checkpointInterval)
 }
 
-// mineSessionsSerial processes sessions one at a time (for large sessions).
+// mineSessionsSerial processes tools-mode sessions one at a time.
 func (s *SyncCmd) mineSessionsSerial(root string, sessionIDs []string, timeout time.Duration, promptName string, label string, tools []string, checkpointInterval int) (int, bool) {
 	totalMined := 0
 	cfg := loadConfig(root)
@@ -499,11 +499,7 @@ func (s *SyncCmd) mineSessionsSerial(root string, sessionIDs []string, timeout t
 			_, err := runClaude(withOpLabel(context.Background(), op), root, prompt, s.Model, tools, timeout)
 			return err
 		}
-		if promptName == "session-extract.md" {
-			err = runToolsRollingSession(root, run)
-		} else {
-			err = run()
-		}
+		err = runToolsRollingSession(root, run)
 		if err != nil {
 			if errors.Is(err, errRollingRestore) {
 				s.fatalSessionErr = err
@@ -963,6 +959,9 @@ func (s *SyncCmd) mineSessions(root string) (int, error) {
 			logMsg("sync", "priority lanes found %d large sessions (>300 msgs)", len(largeIDs))
 			mined, rateLimited := s.mineSessionBatches(root, largeIDs, 1, 20*time.Minute, "session-extract-large.md", "large-session")
 			totalMined += mined
+			if s.fatalSessionErr != nil {
+				return totalMined, s.fatalSessionErr
+			}
 			largeRateLimited = rateLimited
 		}
 	}

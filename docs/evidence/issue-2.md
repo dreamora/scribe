@@ -1,7 +1,7 @@
-# Issue #2: S1 tools-mode rolling files
+# Issue #2: tools-mode rolling files
 
 Date: 2026-11-06
-Verdict: S1 VERIFIED for its bounded normal tools-mode scenario. Fresh independent gate PASSED after one pass. The initial gate remains historically BLOCKED.
+Verdict: S1 and S2 VERIFIED within their tools-mode slice boundaries; S2 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
 Confidence: high
 
 Evidence applies to the named local checks and reviewer probes. The initial gate's directory-alias counterexample is retained below. The authorized correction passes matching regressions and the fresh independent gate. No deployed behavior or whole-PRD completion is claimed.
@@ -14,12 +14,12 @@ The first regression ran before production edits. It reproduced a successful min
 
 ## Findings
 
-- [`session_rolling.go:174`](../../cmd/scribe/session_rolling.go#L174) owns the normal tools transaction. Inventoried project `learnings.md` files receive missing metadata from supported evidence.
-- [`session_rolling.go:190`](../../cmd/scribe/session_rolling.go#L190) rejects pre-existing nested directory aliases before child launch. Markdown symlinks and uninspectable alias targets also fail preflight. The selected KB root is outside that nested inventory, so stable root aliases remain supported.
-- [`session_rolling.go:146`](../../cmd/scribe/session_rolling.go#L146) rejects symlink ancestors below the selected KB root before restoration writes or removals. Stable configured KB-root aliases remain supported.
-- [`session_rolling.go:252`](../../cmd/scribe/session_rolling.go#L252) excludes fenced and indented examples from entry provenance. Both delimiter-length and indented-closing cases are covered.
+- [`session_rolling.go:191`](../../cmd/scribe/session_rolling.go#L191) owns the tools transaction. S1 proved the normal path and missing project `learnings.md` metadata from supported evidence; S2 extends it below.
+- [`session_rolling.go:207`](../../cmd/scribe/session_rolling.go#L207) rejects pre-existing nested directory aliases before child launch. Markdown symlinks and uninspectable alias targets also fail preflight. The selected KB root is outside that nested inventory, so stable root aliases remain supported.
+- [`session_rolling.go:163`](../../cmd/scribe/session_rolling.go#L163) rejects symlink ancestors below the selected KB root before restoration writes or removals. Stable configured KB-root aliases remain supported.
+- [`session_rolling.go:261`](../../cmd/scribe/session_rolling.go#L261) excludes fenced and indented examples from entry provenance. Both delimiter-length and indented-closing cases are covered.
 - [`validate.go:167`](../../cmd/scribe/validate.go#L167) validates proposed content without first writing it to the article path.
-- [`sync_sessions.go:503`](../../cmd/scribe/sync_sessions.go#L503) wraps the normal tools subprocess; success marking follows validation. Normal and large cost labels remain distinct, and rate-limit and daily-budget stops remain supported.
+- [`sync_sessions.go:502`](../../cmd/scribe/sync_sessions.go#L502) wraps the tools subprocess; success marking follows validation. Normal and large cost labels remain distinct, and rate-limit and daily-budget stops remain supported.
 - [`sync.go:159`](../../cmd/scribe/sync.go#L159) prevents the final sync commit after fatal restoration failure. The failure also prevents later mining.
 
 Post-child inventory errors cannot establish complete restoration. They produce a fatal stop even when known files were restored. New or replaced rolling symlinks are rejected; restoration does not write through their targets.
@@ -102,7 +102,7 @@ The probe is preserved at `/private/tmp/scribe-issue2-pass3-probe/cmd/scribe/pas
 
 No live model call, authenticated provider, real ccrider state, live KB repair, installation, push, or publication ran.
 
-### Reviewed code identity
+### Historical S1 reviewed code identity
 
 Base: `54f5762c6458c26e504508398731824fdefeb265`, with pre-existing dirty files preserved. A temporary snapshot retained the original affected files, tracked patch, and source hashes before implementation. Comparing the original source manifest found no changes to pre-existing source files outside the selected S1 files.
 
@@ -148,7 +148,7 @@ The reviewer verified all seven hashes before and after review and reconstructed
 
 Independence audit: the reviewer made a generic lex lookup for `scribe overview`. The controller audited the returned paths, titles, and frontmatter snippets. They contained no authoring discussion, prior review conclusions, or gate outcomes; no documents were fetched. The controller established independence for the pass.
 
-The fresh gate is separate from the initial three-pass BLOCKED gate. No nested gate was started. S1 is VERIFIED only for the bounded normal tools-mode scenario in the slice contract. S2–S5 remain unstarted, provisional, and unauthorized.
+The fresh gate is separate from the initial three-pass BLOCKED gate. No nested gate was started. At this handoff, S1 was VERIFIED only for the bounded normal tools-mode scenario in the slice contract; S2–S5 were unstarted. Their subsequent authorization and S2 work are recorded below.
 
 ## Learned
 
@@ -163,3 +163,77 @@ The selected KB root is an existing trusted routing input and can be a stable al
 Retain the verified S1 path and its evidence. The initial stopped gate remains BLOCKED; the separate fresh gate passed after the authorized correction.
 
 At the S1 handoff, S2–S5 were unstarted. The user subsequently authorized their sequential reassessment, implementation, checks, and bounded independent gates. No whole-PRD implementation claim is supported.
+
+## S2: remaining tools-mode variants
+
+Date: 2026-11-06. Status at the S2 gate handoff: VERIFIED; focused, race, and full local checks passed; fresh independent gate PASSED after one pass. S3–S5 were unstarted at that handoff and required sequential reassessment. S1 was committed separately as `335cb44`. The user later requested the S2 commit; see the [isolated commit verification](issue-2-s2-commit.md).
+
+### Tried and findings
+
+S2 retains the S1 transaction and extends its selection and assessment through normal tools-mode mining, then through large tools-mode mining. Its [current slice contract](../issue-2-rolling-frontmatter-plan.md#s2-complete-protected-tools-mode-rolling-file-variants) supplies B1–B6.
+
+- [`session_rolling.go:83`](../../cmd/scribe/session_rolling.go#L83) recognizes standard/configured project targets and yearly archives, marked files, and malformed headers with a top-level rolling declaration. A parse error must not silently turn explicit rolling output into an ordinary article.
+- [`session_rolling.go:235`](../../cmd/scribe/session_rolling.go#L235) assesses every changed selected file. Missing headers/fields are repairable when dated entries establish provenance. Full directory/filename titles retain Unicode; allowed domains or `general` supply missing domains. Existing invalid values remain unresolved instead of being replaced.
+- [`session_rolling.go:325`](../../cmd/scribe/session_rolling.go#L325) rejects invalid scalar metadata and calendar dates before persistence. Proposed-content validation still rejects contradictory date ranges. Existing valid fields, custom data, and body bytes remain unchanged.
+- [`sync_sessions.go:502`](../../cmd/scribe/sync_sessions.go#L502) protects both normal and large tools prompts. [`sync_sessions.go:962`](../../cmd/scribe/sync_sessions.go#L962) propagates large-session restoration failure immediately, before scan progress or later phases.
+
+The first normal real-child check failed on a repairable marked nonstandard file. After the shared assessment change, nine selected variants passed. The inspected full result contained the expected title, defaults, date range and source; code examples did not contaminate provenance, and the original body bytes survived. That observation preceded large-session implementation and supported retaining the mechanism.
+
+Further discriminating checks reproduced malformed nonstandard output escaping selection, impossible existing calendar dates and empty confidence being accepted, and the unprotected large path accepting invalid output or leaving caught-error writes. A full-sync large restoration fault launched another session and committed before the correction. A new unclassified Markdown alias also falsely recorded success. The latter now causes an incomplete-inventory fatal stop without alias traversal or referent repair; known rolling leaf-alias recovery remains supported. The fixture changes an alias only; it does not claim recovery of an unknown backing file.
+
+### Check and observed output
+
+All Go commands use `GOCACHE=/private/tmp/scribe-issue2-go-cache`:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2Tools(Rolling|Variants)' -count=1 -json
+go test -race -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2Tools(Rolling|Variants)|^TestMineSessionBatches_StopsAfterRateLimit$|^TestRecordSessionProcessed$|^TestApplyMetaRollingAppend_InitFrontmatterLintValid$' -count=1 -json
+make check
+```
+
+Focused: **passed**, 23 top-level tests plus 35 subtests = 58 pass events, zero failures/skips; package 12.666 seconds. Race: **passed**, 26 top-level tests plus 35 subtests = 61 pass events, zero failures/skips; package 12.837 seconds. Full `make check`: **passed**, exit 0. Its observed output was:
+
+```text
+go test -tags "sqlite_fts5"  -count=1 -timeout 20m ./...
+ok  github.com/oliver-kriska/scribe/cmd/scribe  36.907s
+go vet -tags "sqlite_fts5" ./...
+```
+
+The full check used approved local-loopback listener access for the existing hermetic `httptest` fixtures. No live service or model calls were enabled.
+
+| Case | Local observation |
+| --- | --- |
+| B1 | Both real tools prompts produce valid standard/custom/archive/marked outputs, including a missing header and Unicode filename. Pending marker is observed before validation; successful marker follows. Ordinary child-created and untouched invalid regular files remain unchanged. |
+| B2 | Defaults, allowed/fallback domains, full titles, valid custom/contributor fields, preserved dates/sources and body bytes pass. Fenced/indented provenance examples remain excluded; missing references recover to an empty list. Malformed YAML, explicit false, invalid/empty values and unresolved/contradictory dates are rejected. Metadata-rejection fixtures complete successfully as children. |
+| B3 | Both prompts demonstrate mutations before caught failure. Existing rolling variants return to original bytes, new variants disappear, markers stay absent and unrelated bytes survive. A later invalid file also rolls back files repaired earlier in that session. |
+| B4 | Large tools-mode checks use the production large prompt and real process adapter, filesystem and processed log. |
+| B5 | Real large-session Git checkpoint contains validated output and matching marker, excluding failed output. The full-sync restoration-fault case stops later children, staging and final commit, leaves HEAD unchanged and does not advance scan time. The harness injects the filesystem fault; no model capability to create it is claimed. |
+| B6 | S1 regular/alias/root controls pass. Both prompts retain rate-limit rollback/stop and daily-budget refusal before child launch. The focused race run retains the three named processed-log/rate/initialization regressions. |
+
+Raw artifacts: `/private/tmp/scribe-issue2-s2-before-20261106/{normal-red.log,normal-green.log,large-rejection-red.log,variants-green.log,limits-green.log,alias-red.log,alias-green.log,focused.jsonl,race.jsonl,make-check.log}`. Initial compile-only fixture setup errors were corrected before the preserved product-failure reproductions; they are not counted as product failures.
+
+### S2 target identity and preservation
+
+Baseline: `335cb44a7c24656dddd8cd06ac007499f9b9c8ec` plus pre-existing unrelated working changes. The scratch root above retains 387 baseline files, their hashes, original status and tracked patch. `final-target-hashes.json` identifies the frozen seven-file S2 product target. Unrelated baseline file hashes remain unchanged; current source still includes their pre-existing edits.
+
+| S2 final file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/session_rolling.go` | `a74465ec35448fc31cddb7c38f9e9deeeb3d548821e55630db210648c473e4fa` |
+| `cmd/scribe/sync_sessions.go` | `adfbbeb55af55acccc8e78ffd49582453b8ec6f6122729c91523ef3239e92fe9` |
+| `cmd/scribe/issue2_tools_variants_test.go` | `740f6f25228a1c1652be2831e25992f3d98eb7eecff3d8f3d0b22d978cfee80c` |
+| `README.md` | `96052d88bf3a63cec9246fe9ee14a9a298d644c1bdab7363439c196f29b04018` |
+| `cmd/scribe/prompts/session-extract.md` | `df8837d00abad04a0a9ec1bdcc290482cc13dfe500ddcecc2b6af61f94bbf413` |
+| `cmd/scribe/prompts/session-extract-large.md` | `8735c03bda4efe76edf527374abf4bb223ebbac0f45f5c25e1b03d77df5165a8` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `95ae039c2e6799f9fa954ef9a98d4b6e7d1d73304ae93e3e1306ac52a26492b5` |
+
+### S2 gate and next decision
+
+Fresh independent gate: **PASSED**, one independent pass, technical verdict **ready**, no supported material findings. The reviewer verified all seven target hashes before/after and six pre-S2 file origins against the preserved baseline. Package/module origins resolved to the reviewed checkout. The reviewer inspected matching 58 focused and 61 race outcomes plus full test/vet results, then independently ran:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2ToolsVariants' -count=1 -json
+```
+
+Independent result: **passed**, 33 pass events, zero failures/skips. Raw artifact: `/private/tmp/scribe-issue2-s2-review/pass-1/independent-focused.jsonl`. The parent independently reconfirmed all seven unchanged hashes and the 33 independent passes. The historical S1 blocked gate and later passed S1 gate retain their separate identities.
+
+Retain verified S2 and reassess S3. This proves the named local tools-mode behavior, not deployed behavior or whole-PRD completion. No S2 commit, push, installation, live KB change, authenticated model call or publication ran. Envelope integration and bulk repair remain unimplemented at this handoff.

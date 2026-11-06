@@ -94,8 +94,25 @@ func isSessionRollingFile(root, rel string, data []byte) bool {
 		}
 	}
 	raw, err := parseFrontmatterRaw(data)
-	return err == nil && raw["rolling"] == true
+	if err == nil {
+		return raw["rolling"] == true
+	}
+	first, header, hasNL := strings.Cut(string(data), "\n")
+	if !hasNL || !isBareFence(first) {
+		return false
+	}
+	for line := range strings.SplitSeq(header, "\n") {
+		if isBareFence(line) || isLooseFence(line) {
+			break
+		}
+		if rollingDeclarationRE.MatchString(line) {
+			return true
+		}
+	}
+	return false
 }
+
+var rollingDeclarationRE = regexp.MustCompile(`^(?:rolling|"rolling"|'rolling')[ \t]*:`)
 
 func changedRollingFiles(root string, before, after rollingSnapshot) []string {
 	paths := make(map[string]bool)
@@ -181,21 +198,25 @@ func runToolsRollingSession(root string, run func() error) error {
 			continue
 		}
 		if strings.HasSuffix(rel, ".md") {
-			return fmt.Errorf("normal tools mining does not support a Markdown symlink: %s", rel)
+			return fmt.Errorf("tools mining does not support a Markdown symlink: %s", rel)
 		}
 		target, err := os.Stat(filepath.Join(root, rel))
 		if err != nil {
 			return fmt.Errorf("inspect symlink target %s: %w", rel, err)
 		}
 		if target.IsDir() {
-			return fmt.Errorf("normal tools mining does not support a nested directory alias: %s", rel)
+			return fmt.Errorf("tools mining does not support a nested directory alias: %s", rel)
 		}
 	}
 	runErr := run()
 	after, scanErr := captureRollingState(root)
 	for rel, current := range after {
 		prior, existed := before[rel]
-		if current.mode&os.ModeSymlink != 0 && !strings.HasSuffix(rel, ".md") && (!existed || prior.mode != current.mode || !bytes.Equal(prior.data, current.data)) {
+		unchanged := existed && prior.mode == current.mode && bytes.Equal(prior.data, current.data)
+		if current.mode&os.ModeSymlink == 0 || unchanged {
+			continue
+		}
+		if !strings.HasSuffix(rel, ".md") || !isSessionRollingFile(root, rel, prior.data) {
 			scanErr = errors.Join(scanErr, fmt.Errorf("cannot inventory changed symlink: %s", rel))
 		}
 	}
@@ -211,20 +232,8 @@ func runToolsRollingSession(root string, run func() error) error {
 				err = fmt.Errorf("rolling file is a symlink: %s", rel)
 				break
 			}
-			parts := strings.Split(filepath.ToSlash(rel), "/")
-			proposal := current.data
-			if len(parts) == 3 && parts[0] == "projects" && parts[2] == "learnings.md" {
-				proposal, err = repairSessionRolling(root, rel, current.data)
-			} else {
-				failures := validateArticleContent(root, current.data)
-				raw, _ := parseFrontmatterRaw(current.data)
-				if raw["rolling"] != true {
-					failures = append(failures, "rolling marker must be true")
-				}
-				if len(failures) != 0 {
-					err = fmt.Errorf("unsupported rolling repair for %s: %s", rel, strings.Join(failures, "; "))
-				}
-			}
+			proposal, repairErr := repairSessionRolling(root, rel, current.data)
+			err = repairErr
 			if err == nil && !bytes.Equal(proposal, current.data) {
 				var path string
 				path, err = validateActionPath(root, rel)
@@ -296,15 +305,37 @@ func rollingEntryProvenance(body string) (string, string, []string) {
 
 func repairSessionRolling(root, rel string, data []byte) ([]byte, error) {
 	span, err := frontmatterSpan(string(data))
+	var raw map[string]any
+	hasHeader := err == nil
+	if errors.Is(err, errNoFrontmatter) && !strings.HasPrefix(string(data), "---") {
+		err = nil
+		raw = make(map[string]any)
+	}
 	if err != nil {
 		return nil, err
 	}
-	var raw map[string]any
-	if err := yaml.Unmarshal(data[span.YAMLStart:span.YAMLEnd], &raw); err != nil {
-		return nil, fmt.Errorf("invalid YAML: %w", err)
+	if hasHeader {
+		if err := yaml.Unmarshal(data[span.YAMLStart:span.YAMLEnd], &raw); err != nil {
+			return nil, fmt.Errorf("invalid YAML: %w", err)
+		}
 	}
 	if value, exists := raw["rolling"]; exists && value != true {
 		return nil, errors.New("rolling marker conflicts with file name")
+	}
+	for _, field := range []string{"title", "type", "domain", "confidence", "authority"} {
+		if value, exists := raw[field]; exists {
+			text, ok := value.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil, fmt.Errorf("%s must be a nonempty string", field)
+			}
+		}
+	}
+	for _, field := range []string{"created", "updated"} {
+		if value, exists := raw[field]; exists {
+			if _, err := time.Parse(time.DateOnly, stringFromAny(value)); err != nil {
+				return nil, fmt.Errorf("%s is not a valid calendar date", field)
+			}
+		}
 	}
 	body := string(data[span.BodyStart:])
 	first, last, sources := rollingEntryProvenance(body)
@@ -316,7 +347,7 @@ func repairSessionRolling(root, rel string, data []byte) ([]byte, error) {
 		key   string
 		value any
 	}{
-		{"title", titleCaseDashed(filepath.Base(filepath.Dir(rel))) + " Learnings"},
+		{"title", rollingRepairTitle(rel)},
 		{"type", "project"}, {"domain", domain}, {"confidence", "medium"},
 		{"authority", "contextual"}, {"rolling", true},
 		{"tags", []string{}}, {"related", []string{}}, {"sources", sources},
@@ -336,14 +367,34 @@ func repairSessionRolling(root, rel string, data []byte) ([]byte, error) {
 		}
 		additions.Write(encoded)
 	}
-	proposal := append([]byte(nil), data[:span.YAMLEnd]...)
+	proposal := []byte("---\n")
+	if hasHeader {
+		proposal = append([]byte(nil), data[:span.YAMLEnd]...)
+	}
 	if len(proposal) > 0 && proposal[len(proposal)-1] != '\n' {
 		proposal = append(proposal, '\n')
 	}
 	proposal = append(proposal, additions.Bytes()...)
-	proposal = append(proposal, data[span.YAMLEnd:]...)
+	if hasHeader {
+		proposal = append(proposal, data[span.YAMLEnd:]...)
+	} else {
+		proposal = append(proposal, []byte("---\n")...)
+		proposal = append(proposal, data...)
+	}
 	if failures := validateArticleContent(root, proposal); len(failures) != 0 {
 		return nil, errors.New(strings.Join(failures, "; "))
 	}
 	return proposal, nil
+}
+
+func rollingRepairTitle(rel string) string {
+	name := filepath.Base(filepath.Dir(rel)) + "-" + strings.TrimSuffix(filepath.Base(rel), ".md")
+	words := strings.Split(name, "-")
+	for i, word := range words {
+		runes := []rune(word)
+		if len(runes) != 0 {
+			words[i] = strings.ToUpper(string(runes[:1])) + string(runes[1:])
+		}
+	}
+	return strings.Join(words, " ")
 }

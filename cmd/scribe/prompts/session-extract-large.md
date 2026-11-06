@@ -19,6 +19,8 @@ Be selective. Large sessions contain mostly routine code changes. Extract only h
 Write or update wiki articles in {{KB_DIR}} following frontmatter conventions.
 Set sources to include session:{{SESSION_ID}}.
 For learnings and decisions, append to rolling memory files (projects/{name}/learnings.md, decisions-log.md).
+Use `## YYYY-MM-DD | Title` entry headings and explicit `session:<id>` source references. Preserve valid existing metadata.
+Use configured rolling targets from scribe.yaml when applicable. Keep yearly archive filenames. Do not invent historical dates. Go repairs and validates changed rolling files before recording success.
 Rebuild _index.md and _backlinks.json.
 
 Do NOT touch wiki/_sessions_log.json — scribe records processed sessions itself after this run.
