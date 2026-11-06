@@ -39,7 +39,15 @@ The version command prints `scribe 0.5.10-codex.1`.
 Run `./bin/scribe sync` or `./bin/scribe sync --sessions` to use the configuration.
 Zero values for `--parallel`, `--max`, and `--sessions-max` inherit the corresponding
 `sync` settings. Explicit `--parallel` values control project extraction and normal
-session mining, with a maximum of five workers. Large sessions remain serial.
+envelope-mode session mining, with a maximum of five workers. Tools-mode sessions and large sessions remain serial.
+
+Normal tools-mode mining validates changed rolling files before recording a session as processed.
+It rejects nested directory aliases and Markdown symlinks in KB content directories before launching the model process.
+It can fill missing metadata in `projects/<project>/learnings.md` from dated entries and explicit session references.
+It preserves valid metadata and body bytes during repair. Unrecoverable output restores the session's rolling files and leaves the session pending.
+If restoration fails, sync stops before later mining or commits. Large-session enforcement and bulk repair remain planned.
+Restoration rejects symlink parent directories below the selected KB root, including in-KB links, before writes or removals.
+Configured KB-root aliases remain supported.
 
 Run `make check` for tests and vet. The live Codex test is opt-in:
 

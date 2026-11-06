@@ -33,9 +33,11 @@ type SyncCmd struct {
 	SessionsMax  int    `help:"Max normal sessions per run (0 uses sync.max_sessions); large sessions (>300 msgs) get an extra max(1,N/3) slot on top." name:"sessions-max" default:"0"`
 	SessionSort  string `help:"Session sort: score (highest first, default) or date (newest first)." name:"session-sort" default:"score" enum:"date,score"`
 	SkipLarge    bool   `help:"Skip large sessions (>300 messages)." name:"skip-large"`
-	Parallel     int    `help:"Max concurrent project extractions and normal sessions (1-5; 0 uses sync.parallel_extractions)." default:"0"`
+	Parallel     int    `help:"Max concurrent project extractions and normal envelope sessions (1-5; 0 uses sync.parallel_extractions). Tools sessions are serial." default:"0"`
 	Research     bool   `help:"Collect .claude/research/ files from tracked projects." default:"true" negatable:""`
 	Estimate     bool   `help:"With --dry-run, print a token-count estimate for the queued work. Use to sanity-check scope before a real sync."`
+
+	fatalSessionErr error
 }
 
 func (s *SyncCmd) parallelism(cfg *ScribeConfig) int {
@@ -58,6 +60,7 @@ type syncCounters struct {
 }
 
 func (s *SyncCmd) Run() error {
+	s.fatalSessionErr = nil
 	root, err := kbDir()
 	if err != nil {
 		return err
@@ -158,6 +161,9 @@ func (s *SyncCmd) Run() error {
 	s.collectPhase(root, manifest)
 	s.ingestPhase(root)
 	s.extractPhase(root, manifest, cfg, &counters)
+	if s.fatalSessionErr != nil {
+		return s.fatalSessionErr
+	}
 
 	// Phase 2.9: Regenerate the team digest so the committed dashboard
 	// reflects this run. Team KBs only — solo KBs can run `scribe
@@ -335,6 +341,9 @@ func (s *SyncCmd) extractPhase(root string, manifest *Manifest, cfg *ScribeConfi
 		mined, err := s.mineSessions(root)
 		logPhaseOutcome("sync", "session mining", err)
 		counters.sessionsScanned = mined
+		if s.fatalSessionErr != nil {
+			return
+		}
 	}
 
 	// Phase 2.55: Codex session mining (C3). Same triage→envelope→wiki

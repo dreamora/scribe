@@ -14,8 +14,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	gosync "sync"
-	"sync/atomic"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -375,7 +373,7 @@ func (s *SyncCmd) triageSessionIDs(top int, extraArgs ...string) []string {
 // classification and size-pool partitioning need. Mirrors
 // triageSessionIDs exactly except for the --json flag and the parse.
 func (s *SyncCmd) triageSessionsScored(top int, extraArgs ...string) []pendingEntry {
-	scribeExe, _ := os.Executable()
+	scribeExe, _ := sessionExecutable()
 	if scribeExe == "" {
 		scribeExe = "scribe"
 	}
@@ -464,130 +462,10 @@ func (s *SyncCmd) mineSessionBatches(root string, sessionIDs []string, parallel 
 		checkpointInterval = 5
 	}
 
-	dbPath := cfg.CcriderDB
-
-	// Phase 4C envelope dispatch: when configured for envelope mode,
-	// route the whole batch through the Go orchestrator. The legacy
-	// tools path stays in place so users can A/B with a config flip
-	// rather than a deploy.
 	if strings.EqualFold(cfg.SessionMine.Mode, "envelope") {
 		return s.mineSessionBatchesEnvelope(root, sessionIDs, parallel, label, cfg)
 	}
-
-	if parallel <= 1 {
-		// Serial mode for large sessions (avoids concurrent wiki writes).
-		return s.mineSessionsSerial(root, sessionIDs, timeout, promptName, label, tools, checkpointInterval)
-	}
-
-	// Parallel mode: bounded concurrency via semaphore channel.
-	sem := make(chan struct{}, parallel)
-	results := make(chan sessionResult, len(sessionIDs))
-	var wg gosync.WaitGroup
-	// Set by the first goroutine that hits a rate limit; every goroutine
-	// still waiting on the semaphore then returns without calling the
-	// model, instead of queueing N more calls that fail the same way.
-	var stop atomic.Bool
-
-	logMsg("sync", "%s: processing %d sessions (parallel=%d)", label, len(sessionIDs), parallel)
-
-	for i, sid := range sessionIDs {
-		wg.Add(1)
-		go func(idx int, sessionID string) {
-			defer wg.Done()
-			sem <- struct{}{}        // acquire
-			defer func() { <-sem }() // release
-			if stop.Load() {
-				results <- sessionResult{sessionID, false, true, nil}
-				return
-			}
-
-			logMsg("sync", "%s [%d/%d] extracting %s", label, idx+1, len(sessionIDs), sessionID)
-
-			related := queryRelatedSessions(dbPath, sessionID, 7, 10)
-			vars := map[string]string{
-				"KB_DIR":           root,
-				"SESSION_ID_LIST":  sessionID,
-				"RELATED_SESSIONS": formatRelatedSessions(related),
-			}
-			prompt, err := loadPrompt(promptName, vars)
-			if err != nil {
-				results <- sessionResult{sessionID, false, false, err}
-				return
-			}
-
-			ctx := context.Background()
-			_, err = runClaude(withOpLabel(ctx, "session-mine"), root, prompt, s.Model, tools, timeout)
-			if err != nil {
-				// Treat the daily-budget ceiling like a rate-limit so
-				// the session-mine batch stops gracefully and the next
-				// day's cron picks up where this run left off.
-				rl := errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted)
-				if rl {
-					stop.Store(true)
-				}
-				results <- sessionResult{sessionID, false, rl, err}
-				return
-			}
-			results <- sessionResult{sessionID, true, false, nil}
-		}(i, sid)
-	}
-
-	// Close results channel when all goroutines complete.
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	// Collect results and checkpoint periodically.
-	totalMined := 0
-	rateLimited := false
-	sinceCheckpoint := 0
-	var batchIDs []string // session IDs rolled into the next checkpoint commit
-
-	for r := range results {
-		if r.rateLimited {
-			if r.err == nil {
-				logMsg("sync", "%s: %s not started (rate limit hit by a sibling) — will resume next run", label, r.sessionID)
-			} else {
-				logMsg("sync", "%s: rate limited on %s — will resume next run", label, r.sessionID)
-			}
-			rateLimited = true
-			// Don't break — let in-flight goroutines finish, just stop launching new ones would be ideal
-			// but with the channel approach, already-launched goroutines will complete.
-			continue
-		}
-		if r.err != nil {
-			logPhaseDegraded("sync", "session mining", "%s: %s failed: %v", label, r.sessionID, r.err)
-			continue
-		}
-
-		totalMined++
-		sinceCheckpoint++
-		batchIDs = append(batchIDs, r.sessionID)
-		recordSessionProcessed(root, r.sessionID) // Go owns the _sessions_log write, not the model
-		logMsg("sync", "%s: %s complete (%d/%d mined)", label, r.sessionID, totalMined, len(sessionIDs))
-
-		// Checkpoint after every N successful extractions.
-		if sinceCheckpoint >= checkpointInterval && totalMined < len(sessionIDs) {
-			sinceCheckpoint = 0
-			if err := s.rebuildAndReindex(root); err != nil {
-				logPhaseFailure("sync", "checkpoint reindex", err)
-			}
-			committed, err := s.commitAndPush(root, fmt.Sprintf("sync: %s checkpoint (%d sessions)", label, totalMined))
-			if err != nil {
-				logPhaseFailure("sync", "checkpoint commit", err)
-			} else if committed {
-				// Only attribute the batch when a commit actually
-				// happened — on the debounce/nothing-staged paths the
-				// shortstat would describe the PREVIOUS commit. Unrecorded
-				// IDs stay in batchIDs and ride into the next checkpoint.
-				recordBatchOutcome(root, label, batchIDs)
-				batchIDs = nil
-			}
-		}
-	}
-
-	return totalMined, rateLimited
+	return s.mineSessionsSerial(root, sessionIDs, timeout, promptName, label, tools, checkpointInterval)
 }
 
 // mineSessionsSerial processes sessions one at a time (for large sessions).
@@ -613,11 +491,27 @@ func (s *SyncCmd) mineSessionsSerial(root string, sessionIDs []string, timeout t
 			continue
 		}
 
-		ctx := context.Background()
-		_, err = runClaude(withOpLabel(ctx, "session-mine-batch"), root, prompt, s.Model, tools, timeout)
+		run := func() error {
+			op := "session-mine-batch"
+			if promptName == "session-extract.md" {
+				op = "session-mine"
+			}
+			_, err := runClaude(withOpLabel(context.Background(), op), root, prompt, s.Model, tools, timeout)
+			return err
+		}
+		if promptName == "session-extract.md" {
+			err = runToolsRollingSession(root, run)
+		} else {
+			err = run()
+		}
 		if err != nil {
-			if errors.Is(err, ErrRateLimit) {
-				logMsg("sync", "%s: rate limited — will resume next run (%d mined)", label, totalMined)
+			if errors.Is(err, errRollingRestore) {
+				s.fatalSessionErr = err
+				logPhaseFailure("sync", "rolling restoration", err)
+				return totalMined, false
+			}
+			if errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted) {
+				logMsg("sync", "%s: rate limited on %s — will resume next run (%d mined)", label, sid, totalMined)
 				return totalMined, true
 			}
 			logPhaseDegraded("sync", "session mining", "%s: %s failed: %v", label, sid, err)
@@ -1042,6 +936,9 @@ func (s *SyncCmd) mineSessions(root string) (int, error) {
 		logMsg("sync", "priority lanes found %d normal sessions (<=300 msgs)", len(normalIDs))
 		mined, rateLimited := s.mineSessionBatches(root, normalIDs, s.parallelism(cfg), 10*time.Minute, "session-extract.md", "session")
 		totalMined += mined
+		if s.fatalSessionErr != nil {
+			return totalMined, s.fatalSessionErr
+		}
 		if rateLimited {
 			logMsg("sync", "rate limited during normal session mining — skipping large sessions")
 			s.updateScanTimestamp(sessionsLog)

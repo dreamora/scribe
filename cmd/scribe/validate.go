@@ -161,6 +161,10 @@ func validateFile(root, path string) []string {
 	if err != nil {
 		return []string{fmt.Sprintf("cannot read: %v", err)}
 	}
+	return validateArticleContent(root, content)
+}
+
+func validateArticleContent(root string, content []byte) []string {
 	if len(strings.TrimSpace(string(content))) == 0 {
 		return []string{"empty file"}
 	}
