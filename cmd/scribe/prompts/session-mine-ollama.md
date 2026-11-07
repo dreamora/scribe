@@ -50,7 +50,8 @@ SKIP: conversation summaries, routine code changes, transient debug noise.
 - Slug: lowercase, spaces → `-`, strip punctuation, `.md`.
 - Frontmatter required keys: title, type, created: {{TODAY}}, updated: {{TODAY}}, domain, confidence (low|medium|high), tags (≥3 kebab-case), related (array of "[[Title]]" strings), sources (array containing "session:{{SESSION_ID}}").
 - ≤150 lines per article. Quote load-bearing claims as markdown blockquotes ending `— Source: session:{{SESSION_ID}}`.
-- Optional rolling_memory_append: `{"op": "rolling_memory_append", "domain": "<domain>", "target": "learnings", "content": "one paragraph"}`. Target MUST be `learnings` or `decisions-log`. Domain MUST be one already in scribe.yaml.
+- Optional rolling_memory_append: `{"op": "rolling_memory_append", "domain": "<domain>", "target": "learnings", "content": "## YYYY-MM-DD | Title\nEntry with session:<id> reference."}`. Use a configured rolling target when supplied; defaults are `learnings` and `decisions-log`. Domain MUST be one already in scribe.yaml.
+- Preserve valid rolling metadata. Go recovers missing dates from dated entries and missing sources from explicit references before recording success. Do not invent historical dates. This also applies to rolling-file content actions, custom targets, and yearly archives.
 
 - One topic = one article: never two `create` ops with near-identical titles or slugs. If a relevant article is visible in the context you were given, `append` to it instead of creating a parallel page, and reuse its exact title in `related:` wikilinks.
 - Generic knowledge that almost certainly has a page already (well-known patterns, common tool facts) gets NO new stub — use rolling_memory_append or drop it. Near-duplicate pages split future updates and corrupt contradiction resolution.

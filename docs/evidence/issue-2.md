@@ -1,7 +1,7 @@
 # Issue #2: tools-mode rolling files
 
 Date: 2026-11-06
-Verdict: S1 and S2 VERIFIED within their tools-mode slice boundaries; S2 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
+Verdict: S1–S3 VERIFIED within their slice boundaries; S3 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
 Confidence: high
 
 Evidence applies to the named local checks and reviewer probes. The initial gate's directory-alias counterexample is retained below. The authorized correction passes matching regressions and the fresh independent gate. No deployed behavior or whole-PRD completion is claimed.
@@ -237,3 +237,91 @@ go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2ToolsVariants' -count=1 
 Independent result: **passed**, 33 pass events, zero failures/skips. Raw artifact: `/private/tmp/scribe-issue2-s2-review/pass-1/independent-focused.jsonl`. The parent independently reconfirmed all seven unchanged hashes and the 33 independent passes. The historical S1 blocked gate and later passed S1 gate retain their separate identities.
 
 Retain verified S2 and reassess S3. This proves the named local tools-mode behavior, not deployed behavior or whole-PRD completion. No S2 commit, push, installation, live KB change, authenticated model call or publication ran. Envelope integration and bulk repair remain unimplemented at this handoff.
+
+## S3: protected envelope application
+
+Date: 2026-11-06. Status: VERIFIED; focused/race/full local checks passed; fresh independent gate PASSED after one pass. S4/S5 remain unstarted at this handoff. S2 was subsequently committed separately as `eb48423`; its commit verification is a separate record linked from the evidence index. No S3 source was included in that commit.
+
+### Tried and findings
+
+The [S3 contract](../issue-2-rolling-frontmatter-plan.md#s3-isolate-envelope-apply-while-generation-stays-parallel) retains S1/S2 rules and adds envelope isolation across ccrider normal/large sessions and the separate Codex mining driver.
+
+- [`session_mine_envelope.go:152`](../../cmd/scribe/session_mine_envelope.go#L152) generates envelopes without mutations. Workers run these model calls concurrently; the collector at [`session_mine_envelope.go:310`](../../cmd/scribe/session_mine_envelope.go#L310) alone applies, validates/restores, records checked markers and checkpoints. Fatal failures cancel/drain generation without applying queued results.
+- [`session_mine_envelope.go:184`](../../cmd/scribe/session_mine_envelope.go#L184) shares the protected apply boundary with Codex. [`session_rolling.go:195`](../../cmd/scribe/session_rolling.go#L195) runs its checked completion callback after rolling validation. A failed marker write restores rolling output and never increments completion counts.
+- [`wiki_actions.go:470`](../../cmd/scribe/wiki_actions.go#L470) keeps rolling metadata out of generic clamps/date stamps for session output. Ordinary articles retain normalization and collision protection. New rolling meta files start with a marker; S2 policy supplies missing metadata from entry evidence. The existing entity collision path accepts the session-scoped options through [`entity_collision.go:25`](../../cmd/scribe/entity_collision.go#L25).
+- Codex uses its checked `markCodexProcessed` primitive after validation. Fatal restoration propagates through the driver and [`sync.go:361`](../../cmd/scribe/sync.go#L361), stopping subsequent phases and the final commit. Corrective-retry rate/budget limits also stop Codex mining while leaving sessions pending.
+
+The first assembled SQLite → generated envelope → real rolling append → validation → persisted marker check reproduced today's dates and empty sources instead of entry provenance. Its repaired result recovered 2026-10-01/2026-11-01 and the explicit source, preserving the appended body and ignoring a forged model-supplied success ID. This inspected result preceded scheduling and Codex changes.
+
+The deterministic isolation check first reproduced sibling completion/checkpointing while a failed session was held after a demonstrated rolling mutation. After the stage split, two primary generations rendezvous concurrently, but another generation completing cannot apply or checkpoint during that held mutation. Restoration completes before the successful sibling applies. A real Git checkpoint then contains only validated sibling output and its matching marker while a third generation remains held.
+
+Codex regressions first reproduced invented dates, invalid rolling output being counted/marked, and a marker-write error still counting success while leaving changes. All now pass. The large envelope dispatch also incorrectly selected the normal prompt family; its exact `large-session` label now selects the large family without changing operation labels. A corrective-retry daily-budget error now retains the stop result instead of continuing Codex candidates.
+
+### Check and observed output
+
+All final Go commands used `GOCACHE=/private/tmp/scribe-issue2-go-cache`:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope)' -count=1 -json
+go test -race -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope)|^TestMineSessionBatches_StopsAfterRateLimit$|^TestRecordSessionProcessed$|^TestApplyMetaRollingAppend_InitFrontmatterLintValid$|^TestRejectedSessionStaysPending$|^TestEntityCollision|^TestCodexProcessedLog' -count=1 -json
+make check
+```
+
+Focused: **passed**, 31 top-level tests plus 81 subtests = 112 pass events, zero failures/skips; package 15.922 seconds. Race: **passed**, 38 top-level tests plus 81 subtests = 119 pass events, zero failures/skips; package 16.126 seconds. Full `make check`: **passed**, exit 0:
+
+```text
+go test -tags "sqlite_fts5"  -count=1 -timeout 20m ./...
+ok  github.com/oliver-kriska/scribe/cmd/scribe  37.434s
+go vet -tags "sqlite_fts5" ./...
+```
+
+The full check used approved local-loopback access for existing hermetic `httptest` fixtures. Fixture providers replace model reasoning/service access; transcripts, parsed envelopes, filesystem mutations, validation, both logs, restoration and local Git remain real.
+
+| Case | Local evidence |
+| --- | --- |
+| C1 | Complete representative result inspected before expansion: recovered dates/source, preserved append body, complete valid metadata and only the actual session marker. |
+| C2 | Normal/large/Codex caller variants pass for standard/configured targets, archives, marked Unicode content files, missing headers, provenance examples, curated/custom fields and body bytes. All three reject malformed, false, invalid type/domain/confidence, unresolved and contradictory output. Ordinary-article normalization and untouched invalid-file isolation remain intact. |
+| C3 | Two primary calls rendezvous. Parent observes failed-session bytes before releasing failure. A later generation starts without applying its queued sibling, proving generation can advance while the single apply phase remains held. Successful sibling content survives restoration; failed content/marker do not. |
+| C4 | Real local Git checkpoint inspected while third generation is held: validated successful sibling only, matching marker, no failed or incomplete output. No checkpoint occurs while the failed apply is held. |
+| C5 | Both marker-log failures restore an observed rolling mutation and report zero completion. Full sync normal/large/Codex filesystem-fault cases observe actual mutation, then force restoration failure. Each returns the fatal error, leaves sessions pending and HEAD/staging unchanged. No serial Codex candidate/phase runs afterward; already in-flight ccrider generation is cancelled/drained without apply. |
+| C6 | Actual fixture Codex rollout/scoring driver and separate log pass success/rejection cases. Empty transcripts, no-action envelopes, low-score skips, rate/budget limits and corrective-retry limits pass. Race selection retains collision/provenance, processed-log, rate and rolling-init regressions. |
+
+For a discriminating fatal-stop baseline check, copied 382 command source/input files from the preserved pre-S3 snapshot into `baseline-probe/`, verified their hashes, then overlaid only the new regression file and unchanged module files from `eb48423`. Ran:
+
+```sh
+go test -C /private/tmp/scribe-issue2-s3-before-20261106/baseline-probe -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2EnvelopeFatalStopsSync$' -count=1 -v
+```
+
+Baseline result: **failed in all three caller subcases**. The prior source continued after the caught failure and committed; the expected fatal error was nil. Current matching cases pass. Initial full-sync fixture barrier failures came from a shallow excluded project path and Codex filename ordering; those were corrected before the baseline comparison and are setup failures, not product evidence. Parent-directory replacement is a harness-injected filesystem fault, not a claimed model tool capability.
+
+Raw artifacts under `/private/tmp/scribe-issue2-s3-before-20261106`: `representative-{red,green}.log`, `isolation-{red,green}.log`, `codex-{red,green}.log`, `variants-first.log`, `limits-{first,green}.log`, `envelope-green.log`, `fatal-baseline-red.log`, `focused.jsonl`, `race.jsonl`, and `make-check.log`.
+
+### S3 target identity and preservation
+
+The pre-S3 snapshot contains 388 file origins and hashes, taken before product edits at `335cb44` plus verified S2 and unrelated working changes. HEAD subsequently advanced to `eb48423` for the isolated S2 commit; that operation preserved working bytes. S3 review uses these pre-S3 file origins, not the entire current Git diff. Unrelated original source hashes remain unchanged.
+
+`final-target-hashes.json` and `target.patch` in the scratch root identify the frozen 13-file S3 product delta:
+
+| S3 final file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/session_rolling.go` | `0c4f0b174bc844bdf49c3d395cca487d1393d8507102f0a5b75850bc449235f0` |
+| `cmd/scribe/session_mine_envelope.go` | `d5a61f66bd934ec416335f05221be0edade38d829664ff506fc27fdd1fc474fb` |
+| `cmd/scribe/entity_collision.go` | `fde18e68165ce7b3ac7506e1d21f2b17ea355667928185eb23b5cb60b5c9a2ee` |
+| `cmd/scribe/wiki_actions.go` | `f9863c9d0a2f5a701607a324ea09a0e074ff636ed0b01d62b43d027519d0c94f` |
+| `cmd/scribe/codex_mine.go` | `cbf4963569a4e03d106cb8c2643cc087bcfbcfe118e8eb498306ae52bd1a7822` |
+| `cmd/scribe/sync.go` | `fced13377d92653a06fce8d2ac47b051cbd2a8892bb9863a6f4b7ac579ca3c55` |
+| `cmd/scribe/issue2_envelope_rolling_test.go` | `9bdffed6cf3820e4851513ba39dd6666117e88eacf0e00e5c96de6046252cd03` |
+| `README.md` | `e18bde8cf2f14a807dcb61369b4e47799089799a868c01276b4b9225a754e4c2` |
+| `cmd/scribe/prompts/session-mine-anthropic.md` | `19c946b303d41524fb0c0486777c607a4c83c90418ff18cc330a4620a5a19fb7` |
+| `cmd/scribe/prompts/session-mine-ollama.md` | `877f4e83e5e2e22505b10c7620f8322b2b053bd3d3bc736b4d0fcc0da10c1588` |
+| `cmd/scribe/prompts/session-extract-anthropic.md` | `e1f8a38ec6c39bba621498ab7ef2fa29a1896a3d1d63c3a13bef38becd816edd` |
+| `cmd/scribe/prompts/session-extract-ollama.md` | `932c517cea9de7e6ca20ac7b86f2ba679981ee9d2bfb1eccddb75354261812ef` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `76abe0246725d044d739ca491a9037f97b832b12d02f3007d70bdfb173bc584d` |
+
+### S3 gate and next decision
+
+Fresh independent gate: **PASSED** after one independent pass, technical verdict **ready**, no supported findings or testing gaps. The reviewer verified 13/13 final hashes before/after, 12/12 baseline origins, and absence of the new test from the baseline. It independently ran `go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2Envelope' -count=1 -json`: **54 passing named outcomes, zero failures/skips, exit 0**, package 1.976 seconds.
+
+The reviewer reconstructed `335cb44` plus all 388 pre-S3 baseline files and verified module/package origins. The representative check there produced one expected behavioral failure: invented dates and empty sources. Artifacts: `/private/tmp/scribe-issue2-s3-review/pass-1/{independent-focused.jsonl,independent-baseline-representative.jsonl,baseline-probe-origins.json,baseline-probe-package.json,target-hashes.json}`. The parent independently reconfirmed all 13 unchanged hashes, the 54 independent passes, and final full test/vet results. S1/S2 historical gates and commits remain separate. Retain verified S3 and reassess S4.
+
+The rolling-only recovery boundary excludes unrelated article output. Primary generation can already be in flight when a fatal error occurs; queued envelopes are discarded and workers drained before return. These local caught-failure checks do not prove crash recovery, external-mutator safety, deployed behavior, or whole-PRD completion. No S3 commit, installation, push, live KB or authenticated-model action ran.

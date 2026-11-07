@@ -189,6 +189,10 @@ func rollingRestorePath(root, rel string) (string, error) {
 }
 
 func runToolsRollingSession(root string, run func() error) error {
+	return runRollingSession(root, run, nil)
+}
+
+func runRollingSession(root string, run, complete func() error) error {
 	before, err := captureRollingState(root)
 	if err != nil {
 		return fmt.Errorf("capture rolling files: %w", err)
@@ -198,14 +202,14 @@ func runToolsRollingSession(root string, run func() error) error {
 			continue
 		}
 		if strings.HasSuffix(rel, ".md") {
-			return fmt.Errorf("tools mining does not support a Markdown symlink: %s", rel)
+			return fmt.Errorf("session mining does not support a Markdown symlink: %s", rel)
 		}
 		target, err := os.Stat(filepath.Join(root, rel))
 		if err != nil {
 			return fmt.Errorf("inspect symlink target %s: %w", rel, err)
 		}
 		if target.IsDir() {
-			return fmt.Errorf("tools mining does not support a nested directory alias: %s", rel)
+			return fmt.Errorf("session mining does not support a nested directory alias: %s", rel)
 		}
 	}
 	runErr := run()
@@ -246,6 +250,9 @@ func runToolsRollingSession(root string, run func() error) error {
 				break
 			}
 		}
+	}
+	if err == nil && complete != nil {
+		err = complete()
 	}
 	if err != nil {
 		if restoreErr := restoreRollingState(root, before, after); restoreErr != nil || scanErr != nil {

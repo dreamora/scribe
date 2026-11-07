@@ -99,11 +99,7 @@ func (s *SyncCmd) mineCodexSessions(root string, cfg *ScribeConfig) (int, error)
 			if errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted) {
 				// Don't mark processed — resume cleanly next run.
 				logMsg("sync", "codex mining rate/budget limited on %s — resuming next run", c.id)
-				setRunStat("codex_rate_limited", true)
-				if mined == 0 {
-					return 0, skipRun("codex mining rate/budget limited before any session was mined")
-				}
-				return mined, nil
+				return codexMiningLimited(mined)
 			}
 			// One corrective retry, same posture as mineSessionEnvelope:
 			// local models occasionally wrap the envelope in prose.
@@ -111,6 +107,9 @@ func (s *SyncCmd) mineCodexSessions(root string, cfg *ScribeConfig) (int, error)
 			env, err = runSessionEnvelopeOnce(ctx, provider, "codex-session", "session-extract",
 				c.cwd, c.id, "", rendered, nil, timeout, true)
 			if err != nil {
+				if errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted) {
+					return codexMiningLimited(mined)
+				}
 				// Leave it unmarked so a future run retries — a
 				// transient model failure shouldn't lose the session.
 				logPhaseDegraded("sync", "codex session mining", "codex envelope %s failed after retry: %v", c.id, err)
@@ -120,21 +119,32 @@ func (s *SyncCmd) mineCodexSessions(root string, cfg *ScribeConfig) (int, error)
 
 		// Same class as session-mine: entities distilled from a Codex
 		// transcript must not overwrite an existing curated doc.
-		res, applyErr := applyWikiActions(root, env, entityWriterApplyOptions())
+		applyErr := applySessionEnvelope(ctx, root, provider, env, func() error {
+			return markCodexProcessed(root, c.id, c.cwd, "")
+		})
 		if applyErr != nil {
+			if errors.Is(applyErr, errRollingRestore) {
+				s.fatalSessionErr = applyErr
+				return mined, applyErr
+			}
+			if errors.Is(applyErr, ErrRateLimit) || errors.Is(applyErr, ErrDailyBudgetExhausted) {
+				return codexMiningLimited(mined)
+			}
 			logPhaseDegraded("sync", "codex session mining", "codex envelope %s apply error: %v", c.id, applyErr)
 			continue
 		}
-		if len(res.Errors) > 0 {
-			logMsg("sync", "codex envelope %s: applied %d action(s), %d error(s): %v",
-				c.id, len(res.Applied), len(res.Errors), res.Errors)
-		} else {
-			logMsg("sync", "codex envelope %s: applied %d action(s)", c.id, len(res.Applied))
-		}
-		recordCodexProcessed(root, c.id, c.cwd, "")
+		logMsg("sync", "codex envelope %s: complete", c.id)
 		mined++
 	}
 
 	logMsg("sync", "codex mining done: mined %d session(s)", mined)
+	return mined, nil
+}
+
+func codexMiningLimited(mined int) (int, error) {
+	setRunStat("codex_rate_limited", true)
+	if mined == 0 {
+		return 0, skipRun("codex mining rate/budget limited before any session was mined")
+	}
 	return mined, nil
 }

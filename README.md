@@ -47,9 +47,13 @@ It fills missing metadata in standard and configured rolling targets under `proj
 It derives missing dates from dated entries and missing sources from explicit session references. It reports unresolved dates instead of inventing them.
 It preserves valid metadata and body bytes during repair. Unrecoverable output restores the session's rolling files and leaves the session pending.
 Untouched invalid regular files do not block mining. Malformed rolling metadata, explicit false markers on named targets, and invalid existing values require manual correction.
-If restoration fails, sync stops before later mining or commits. Envelope-mode enforcement and bulk repair remain planned.
+If restoration fails, sync stops before later mining or commits. Bulk repair remains planned.
 Restoration rejects symlink parent directories below the selected KB root, including in-KB links, before writes or removals.
 Configured KB-root aliases remain supported.
+
+Envelope mining uses the same rolling-file validity and restoration rules. Model generation can run in parallel; Go applies one session at a time and checkpoints only after validation and a persisted success marker.
+Failed envelope sessions restore their rolling changes and stay pending without removing a successful sibling's output. Codex rollout mining uses the same apply boundary and its separate processed log.
+Rolling metadata uses entry evidence; ordinary article normalization retains its existing behavior. A processed-log write failure also restores that session's rolling changes and does not count it as completed.
 
 Run `make check` for tests and vet. The live Codex test is opt-in:
 

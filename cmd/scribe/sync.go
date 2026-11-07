@@ -355,6 +355,9 @@ func (s *SyncCmd) extractPhase(root string, manifest *Manifest, cfg *ScribeConfi
 		cmined, cerr := s.mineCodexSessions(root, cfg)
 		logPhaseOutcome("sync", "codex session mining", cerr)
 		counters.sessionsScanned += cmined
+		if s.fatalSessionErr != nil {
+			return
+		}
 	}
 
 	// Phase 2.6: Absorb raw articles.

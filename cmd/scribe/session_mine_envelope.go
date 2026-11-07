@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -135,21 +136,29 @@ func fetchAndRenderTranscript(dbPath, sessionID string, maxChars int) string {
 // num_ctx; without it Ollama silently truncates the tail.
 func mineSessionEnvelope(ctx context.Context, root, dbPath, sessionID string, provider llmProviderGenerator, cfg SessionMineConfig, opLabel, promptBase string) (bool, error) {
 	ctx = withOllamaNumCtx(ctx, cfg.NumCtx)
+	env, err := generateSessionEnvelope(ctx, dbPath, sessionID, provider, cfg, opLabel, promptBase)
+	if err != nil {
+		return errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted), err
+	}
+	err = applySessionEnvelope(ctx, root, provider, env, func() error {
+		return applyMetaSessionsLogAppend(root, MetaAction{Op: "sessions_log_append", SessionID: sessionID}, ApplyOptions{})
+	})
+	return errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted), err
+}
+
+func generateSessionEnvelope(ctx context.Context, dbPath, sessionID string, provider llmProviderGenerator, cfg SessionMineConfig, opLabel, promptBase string) (WikiActionEnvelope, error) {
+	ctx = withOllamaNumCtx(ctx, cfg.NumCtx)
 	related := queryRelatedSessions(dbPath, sessionID, 7, 10)
 	transcript := fetchAndRenderTranscript(dbPath, sessionID, cfg.TranscriptMaxChars)
 	if transcript == "" {
-		// Empty / unreadable transcript: record the session as
-		// processed via a direct meta apply so the next run doesn't
-		// re-queue it. Skip the LLM entirely.
-		recordSessionProcessed(root, sessionID)
-		return false, nil
+		return WikiActionEnvelope{Version: 2}, nil
 	}
 	projectPath := lookupSessionProjectPath(dbPath, sessionID)
 	timeout := time.Duration(cfg.TimeoutMin) * time.Minute
 	env, err := runSessionEnvelopeOnce(ctx, provider, opLabel, promptBase, projectPath, sessionID, formatRelatedSessions(related), transcript, nil, timeout, false)
 	if err != nil {
 		if errors.Is(err, ErrRateLimit) || errors.Is(err, ErrDailyBudgetExhausted) {
-			return true, err
+			return WikiActionEnvelope{}, err
 		}
 		// One-shot corrective retry on parse failure (same shape as
 		// pass-2 envelope at sync.go:1851). Anthropic rarely needs it;
@@ -158,30 +167,33 @@ func mineSessionEnvelope(ctx context.Context, root, dbPath, sessionID string, pr
 		// "OUTPUT ONLY JSON" instruction so the retry isn't an
 		// identical-prompt do-over.
 		logMsg("sync", "%s envelope %s: first attempt failed (%v) — retrying with corrective prompt", opLabel, sessionID, err)
+		if ctx.Err() != nil {
+			return WikiActionEnvelope{}, ctx.Err()
+		}
 		env, err = runSessionEnvelopeOnce(ctx, provider, opLabel, promptBase, projectPath, sessionID, formatRelatedSessions(related), transcript, nil, timeout, true)
 		if err != nil {
-			return false, err
+			return WikiActionEnvelope{}, err
 		}
 	}
-	// Session-mine writes entities distilled from a transcript — a different
-	// source than any existing curated doc, so it must not overwrite one. A
-	// session referencing the ahrefs studies overwrote that 14-study hub with
-	// a session-grounded stub on 2026-06-03; entityWriterApplyOptions keeps
-	// create create-if-absent and protects provenance frontmatter.
-	res, applyErr := applyWikiActions(root, env, entityWriterApplyOptions())
-	if applyErr != nil {
-		return false, applyErr
+	return env, nil
+}
+
+func applySessionEnvelope(ctx context.Context, root string, provider llmProviderGenerator, env WikiActionEnvelope, complete func() error) error {
+	if len(env.Actions) == 0 && len(env.Meta) == 0 {
+		return complete()
 	}
-	if len(res.Errors) > 0 {
-		logMsg("sync", "%s envelope %s: %d applied, %d errors: %v", opLabel, sessionID, len(res.Applied), len(res.Errors), res.Errors)
-	} else {
-		logMsg("sync", "%s envelope %s: applied %d action(s)", opLabel, sessionID, len(res.Applied))
-	}
-	// Go owns wiki/_sessions_log.json: the model's sessions_log_append is
-	// accepted but never applied (see applyMetaAction), so the session
-	// that was actually mined is recorded here, unconditionally.
-	recordSessionProcessed(root, sessionID)
-	return false, nil
+	opts := entityWriterApplyOptions()
+	opts.PreserveRollingMetadata = true
+	return runRollingSession(root, func() error {
+		res, err := applyEntityEnvelopeWithOptions(ctx, root, provider, env, opts)
+		if err != nil {
+			return err
+		}
+		if len(res.Errors) != 0 {
+			return fmt.Errorf("session apply rejected actions: %v", res.Errors)
+		}
+		return nil
+	}, complete)
 }
 
 // promptBaseForSessionLabel maps a runtime op label like
@@ -191,7 +203,7 @@ func mineSessionEnvelope(ctx context.Context, root, dbPath, sessionID string, pr
 // the prompt doesn't care about).
 func promptBaseForSessionLabel(label string) string {
 	switch {
-	case strings.HasPrefix(label, "session-extract"):
+	case strings.HasPrefix(label, "session-extract"), label == "large-session":
 		return "session-extract"
 	case strings.HasPrefix(label, "session-mine"):
 		return "session-mine"
@@ -223,11 +235,9 @@ func lookupSessionProjectPath(dbPath, sessionID string) string {
 // mineSessionBatches returns, so the dispatcher swap is transparent
 // to mineSessions.
 //
-// Concurrency: parallel applies the same way as the tools path, but
-// without claude-p's process overhead each session is mostly LLM
-// wallclock. Ollama serializes through the GPU anyway, so parallel=1
-// is a reasonable default for local providers; the user controls it
-// via sync.parallel_extractions.
+// Workers only generate envelopes. The collector owns apply, validation,
+// restoration, processed markers and checkpoints so snapshots cannot
+// capture or undo another session's incomplete writes.
 func (s *SyncCmd) mineSessionBatchesEnvelope(root string, sessionIDs []string, parallel int, label string, cfg *ScribeConfig) (int, bool) {
 	if len(sessionIDs) == 0 {
 		return 0, false
@@ -245,48 +255,74 @@ func (s *SyncCmd) mineSessionBatchesEnvelope(root string, sessionIDs []string, p
 	logMsg("sync", "%s envelope: %d sessions, parallel=%d (provider=%s)", label, len(sessionIDs), parallel, provider.Name())
 
 	type job struct {
-		sid   string
-		index int
+		sid string
 	}
 	type res struct {
-		sid         string
-		ok          bool
-		rateLimited bool
-		err         error
+		sid string
+		env WikiActionEnvelope
+		err error
 	}
 
 	in := make(chan job)
 	out := make(chan res, len(sessionIDs))
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(withOllamaNumCtx(context.Background(), cfg.SessionMine.NumCtx))
+	defer cancel()
 
 	promptBase := promptBaseForSessionLabel(label)
+	var workers sync.WaitGroup
 	for range parallel {
+		workers.Add(1)
 		go func() {
+			defer workers.Done()
 			for j := range in {
-				rateLimited, err := mineSessionEnvelope(ctx, root, dbPath, j.sid, provider, cfg.SessionMine, label, promptBase)
-				r := res{sid: j.sid, ok: err == nil && !rateLimited, err: err, rateLimited: rateLimited}
-				out <- r
+				if ctx.Err() != nil {
+					return
+				}
+				env, err := generateSessionEnvelope(ctx, dbPath, j.sid, provider, cfg.SessionMine, label, promptBase)
+				out <- res{sid: j.sid, env: env, err: err}
 			}
 		}()
 	}
 
 	go func() {
-		for i, sid := range sessionIDs {
-			in <- job{sid: sid, index: i}
+		defer close(in)
+		for _, sid := range sessionIDs {
+			select {
+			case in <- job{sid: sid}:
+			case <-ctx.Done():
+				return
+			}
 		}
-		close(in)
+	}()
+	go func() {
+		workers.Wait()
+		close(out)
 	}()
 
 	total := 0
 	rateLimited := false
 	since := 0
 	var batchIDs []string
-	for range sessionIDs {
-		r := <-out
-		if r.rateLimited {
+	for r := range out {
+		if rateLimited || s.fatalSessionErr != nil {
+			continue
+		}
+		if r.err == nil {
+			r.err = applySessionEnvelope(ctx, root, provider, r.env, func() error {
+				return applyMetaSessionsLogAppend(root, MetaAction{Op: "sessions_log_append", SessionID: r.sid}, ApplyOptions{})
+			})
+		}
+		if errors.Is(r.err, errRollingRestore) {
+			s.fatalSessionErr = r.err
+			logPhaseFailure("sync", "rolling restoration", r.err)
+			cancel()
+			continue
+		}
+		if errors.Is(r.err, ErrRateLimit) || errors.Is(r.err, ErrDailyBudgetExhausted) {
 			logMsg("sync", "%s envelope: rate limited on %s — will resume next run", label, r.sid)
 			rateLimited = true
+			cancel()
 			continue
 		}
 		if r.err != nil {

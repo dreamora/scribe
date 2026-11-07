@@ -247,6 +247,8 @@ type ApplyOptions struct {
 	// carry a real earlier date, which no value check can tell from an
 	// invented one.
 	StampDates bool
+	// Rolling metadata in session output uses entry evidence, not generic clamps.
+	PreserveRollingMetadata bool
 	// ValidFactIDs: the set of fact IDs the facts pass produced for the
 	// source article. Brackets not in this set are stripped. Only
 	// consulted when SanitizeContent is true. nil ⇒ strip ALL [cNN-fM]
@@ -465,8 +467,23 @@ func applyWikiActions(root string, env WikiActionEnvelope, opts ApplyOptions) (A
 	// (validateActionPath) below. env is a by-value copy; mutating it
 	// here never escapes to the caller. Opt-in via SanitizeContent.
 	if opts.SanitizeContent {
-		sanitizeEnvelopeContent(&env, opts.ValidFactIDs)
-		clampEnvelopeFrontmatter(&env, root)
+		if opts.PreserveRollingMetadata {
+			actions := make([]WikiAction, 0, len(env.Actions))
+			for _, a := range env.Actions {
+				if sessionRollingAction(root, a) {
+					actions = append(actions, a)
+					continue
+				}
+				ordinary := WikiActionEnvelope{Actions: []WikiAction{a}}
+				sanitizeEnvelopeContent(&ordinary, opts.ValidFactIDs)
+				clampEnvelopeFrontmatter(&ordinary, root)
+				actions = append(actions, ordinary.Actions...)
+			}
+			env.Actions = actions
+		} else {
+			sanitizeEnvelopeContent(&env, opts.ValidFactIDs)
+			clampEnvelopeFrontmatter(&env, root)
+		}
 		// envelope-sanitization-unification-analysis.md recommends
 		// defaulting the unknown-top-dir remap on, gated behind the same
 		// opt-in, "revisit after a KB-wide dry run". The 2026-05-16 sync
@@ -490,7 +507,11 @@ func applyWikiActions(root string, env WikiActionEnvelope, opts ApplyOptions) (A
 		}
 		switch a.Op {
 		case "create":
-			applyCreateAction(&res, i, abs, a, opts)
+			actionOpts := opts
+			if opts.PreserveRollingMetadata && sessionRollingAction(root, a) {
+				actionOpts.StampDates = false
+			}
+			applyCreateAction(&res, i, abs, a, actionOpts)
 		case "append":
 			applyAppendAction(&res, i, abs, a, opts)
 		case "replace_section":
@@ -509,6 +530,18 @@ func applyWikiActions(root string, env WikiActionEnvelope, opts ApplyOptions) (A
 		res.Applied = append(res.Applied, metaActionLabel(m))
 	}
 	return res, nil
+}
+
+func sessionRollingAction(root string, a WikiAction) bool {
+	if isSessionRollingFile(root, a.Path, []byte(a.Content)) || a.Frontmatter["rolling"] == true {
+		return true
+	}
+	path, err := validateActionPath(root, a.Path)
+	if err != nil {
+		return false
+	}
+	existing, err := os.ReadFile(path)
+	return err == nil && isSessionRollingFile(root, a.Path, existing)
 }
 
 // resolveActionPath validates the action's path, optionally re-homing a
@@ -977,6 +1010,9 @@ func applyMetaRollingAppend(root string, m MetaAction, opts ApplyOptions) error 
 			return fmt.Errorf("mkdir project dir: %w", err)
 		}
 		fm := rollingFileFrontmatter(m.Domain, m.Target)
+		if opts.PreserveRollingMetadata {
+			fm = "---\nrolling: true\n---\n"
+		}
 		if err := os.WriteFile(path, []byte(fm), 0o644); err != nil {
 			return fmt.Errorf("init rolling file: %w", err)
 		}

@@ -1,12 +1,12 @@
 # Issue #2: rolling-file validity slice plan
 
-Status: S1 and S2 verified; S3 reassessment
+Status: S1–S3 verified; S4 reassessment
 
 Intent: [confirmed PRD](issue-2-rolling-frontmatter-prd.md). Its requirements and acceptance results remain authoritative.
 
 Execution permission: The user authorized local S1 implementation on 2026-11-05, then the JEP-3 correction and fresh gate on 2026-11-06. The user subsequently requested the S1 commit and sequential reassessment, implementation, checks, and bounded independent gates for S2–S5. Tracker writes, live KB repair, installation, pushes, and publication remain unauthorized.
 
-Current slice: S3 reassessment. S1 and S2 are VERIFIED within their tools-mode boundaries. Their fresh independent gates each PASSED after one pass with technical verdict ready and no supported material findings. The initial three-pass S1 gate remains historically BLOCKED. S3–S5 remain unimplemented and provisional; reassess each before implementation and finish its checks/gate before advancing. S1 was committed separately as `335cb44`.
+Current slice: S4 reassessment. S1–S3 are VERIFIED within their slice boundaries. Each fresh independent gate PASSED after one pass with technical verdict ready and no supported material findings. The initial three-pass S1 gate remains historically BLOCKED. S4/S5 remain unimplemented and provisional. Finish each slice and its gate before advancing. S1/S2 were committed separately as `335cb44` and `eb48423`.
 
 ## Inspection and task boundary
 
@@ -152,6 +152,47 @@ Revise: a selected variant escapes assessment, repair changes body/valid metadat
 
 Stop: the contract needs a new product decision, safe local isolation is unavailable, or unrelated work cannot be preserved. Report the gap. Do not claim S2 verified or begin S3.
 
+## S3: isolate envelope apply while generation stays parallel
+
+Status: VERIFIED; focused/race/full local checks passed; fresh independent gate PASSED after one pass with technical verdict ready and no supported findings/testing gaps. Pre-S3 dirty baseline: `335cb44` plus preserved S2/unrelated working edits, captured with file origins/hashes under `/private/tmp/scribe-issue2-s3-before-20261106`. HEAD later advanced to `eb48423` for the isolated verified S2 commit without changing those working bytes.
+
+### Aim and boundary
+
+Outcome: ccrider envelope model calls remain parallel, while one Go coordinator applies, validates or restores, records the correct session marker, and checkpoints between sessions. Codex mining uses the same protected apply boundary with its separate processed log. A failed session cannot erase a successful sibling's rolling content. Unrestorable output stops later mining and final commits.
+
+Question: Can the existing entity executor and S2 assessment share one envelope-session boundary without the generic sanitizer/date stamps replacing rolling evidence or checkpoints observing partial output? Retain the current provider boundary and ordinary-article collision/normalization behavior. Add a session-scoped rolling policy so raw rolling metadata reaches S2 assessment. Split parallel generation from serial apply rather than placing a lock around each full model call. The latter would lose required generation parallelism.
+
+Depends on S1's observed restoration/fatal-commit protections and S2's verified selection, metadata, alias and body-preservation rules. Preserve normal/large prompt and cost labels, existing provider selection, empty-transcript/low-score skip behavior, ordinary article normalization and create-collision protection. Use fixture providers only for model responses; SQLite transcripts, generated envelopes, filesystem mutations, validation, both processed logs, restoration and local Git remain real. No authenticated providers or live KBs.
+
+Scope: complete mining R1/R7/R8 and retain R2–R4 across both ccrider envelope sizes and the Codex caller. Archives, configured targets, marked nonstandard outputs, all metadata/provenance rejection cases, and existing root-alias containment remain included. Restoration still covers rolling output, not unrelated articles. The fatal guarantee remains one sync invocation; no crash recovery or persistent quarantine is added. S4/S5 CLI preview/apply remain excluded.
+
+### Build and proof
+
+First prove one ccrider session from a fixture SQLite transcript through generation, real rolling meta append, shared repair/validation and persisted success marker. Inspect its complete body/dates/sources before changing batch scheduling or adding Codex variants. Then retain that boundary while splitting primary generation from serial application and adding other callers.
+
+Representative observation, 2026-11-06: `TestIssue2EnvelopeRepresentative` first failed because new rolling metadata used the current date and empty sources. After the session-scoped apply policy, the real SQLite → structured response → filesystem → validation → processed-log path passed. Inspected output recovered 2026-10-01/2026-11-01 and its explicit session reference, preserved the appended body, and recorded only the actual session, ignoring a forged model marker. The shared transaction now supports a checked completion callback after validation, so marker-write failure can restore rolling output instead of claiming success. Decision: retain this path and continue to batch isolation and other callers. Raw representative red/green logs are in the pre-S3 scratch root.
+
+Completed observation: C1–C6 pass for normal/large ccrider and Codex envelope callers. Final focused checks passed 112 events, targeted race checks passed 119 events, zero failures/skips; `make check` passed tests and vet. The same full-sync fatal cases fail on the verified pre-S3 source origins. The fresh gate PASSED in one pass with 54 independently rerun passing outcomes and an independently reproduced representative baseline failure. [S3 evidence](evidence/issue-2.md#s3-protected-envelope-application) records origins, exact commands and limits. Decision: retain verified S3 and reassess S4.
+
+| Case | Required observation |
+| --- | --- |
+| C1: representative envelope | A real fixture transcript yields a structured rolling append. Result has supported earliest/latest dates and sources, preserved body bytes and complete metadata before its correct processed marker. No model-supplied extra session can be marked. |
+| C2: variants and provenance | Both ccrider prompt families and Codex use S2's metadata/selection policy for rolling meta and content actions. Preserve valid/custom fields, reject malformed/false/invalid/unrecoverable values, avoid invented dates and retain ordinary-article normalization. |
+| C3: parallel generation, isolated apply | At least two provider generations rendezvous concurrently. After an actual failed-session mutation to a shared rolling file, another session cannot apply or checkpoint until failure restoration completes. Its successful content and marker survive; failed content/marker do not. |
+| C4: checkpoint boundary | Inspect a real local Git checkpoint while a sibling generation/apply is held at a deterministic barrier. No unvalidated bytes or failed marker appear. Generation may overlap that safe checkpoint; apply may not. |
+| C5: caught/fatal failures | Observe real mutations before injected apply/validation failure; restore original rolling bytes/remove new files and leave the appropriate log pending. Through actual sync orchestration, failed restoration stops later ccrider/Codex mining, staging/checkpoints and final commits. |
+| C6: caller compatibility | Codex fixtures cover its actual rollout/scoring driver and separate `_codex_sessions_log.json`; ccrider covers normal/large dispatch. Retain empty transcript, no-action, low-score, rate/budget and collision regressions without live calls. |
+
+Run discriminating checks before each relevant fix. Record the first complete observed result before expanding. On the final S3 target run focused S1/S2/S3 checks, targeted race/compatibility checks, then required `make check`. Synchronize affected envelope prompts, README and template claims. Freeze source for the parent's fresh independent gate; do not start a nested gate.
+
+### Decision rule
+
+Continue: C1–C6 pass at their named real boundaries, focused/race/full checks pass and a fresh independent gate passes. Retain verified S3, then reassess S4.
+
+Revise: generic metadata clamps replace rolling evidence, apply/restore/checkpoint phases overlap, a failed session undoes sibling output, or a caller records success/continues commits after an unresolved failure. Correct within S3 and repeat the affected proof.
+
+Stop: a new product decision is necessary, supported caller behavior cannot be preserved, or required mutation/isolation evidence cannot be obtained safely. Keep the gap explicit and do not start S4.
+
 ## Provisional continuation
 
 These are outcomes and dependency edges, not implementation tickets. Refine only the next selected slice after inspecting its predecessor's evidence. Execute serially; the slices share state and code.
@@ -159,7 +200,7 @@ These are outcomes and dependency edges, not implementation tickets. Refine only
 | Slice | Complete behavior and proof to develop | Depends on and required behavior | PRD coverage |
 | --- | --- | --- | --- |
 | S2 | VERIFIED under the contract above; fresh gate PASSED in one pass. | S1 supplies subprocess change assessment, valid completion, restoration, and fatal-stop behavior. | Tools-mode R1, R3–R4, R7–R8 and R2 mining recognition. |
-| S3 | Apply the same validity contract to envelope mining. Keep model calls parallel while serializing apply, validation, restoration, and checkpoints. Prove that one failed session cannot undo a successful sibling. Check the Codex mining caller's separate processed log. | S2 supplies the complete selection and metadata policy; S1 supplies proven caught-failure restoration and commit suppression. Envelope locking still needs its own proof. | Complete mining R1, R7–R8; preserve R3–R4 across envelope writers. |
+| S3 | VERIFIED under C1–C6; fresh gate PASSED in one pass. | S2 supplies selection/metadata policy; S1 supplies caught-failure recovery. The single apply coordinator supplies envelope isolation while generation stays parallel. | Mining R1, R7–R8 and retained R2–R4. |
 | S4 | Preview rolling-only repair across a selected KB, including untouched projects and archives. Exercise the real CLI, selectors, sync lock, proposed counts, nonzero unresolved results, and a no-content-write assertion. | S2 supplies selection and metadata assessment. S3 is scheduled first but is not a behavioral prerequisite for read-only preview. | R2–R4 across the full selection; preview portion of R5–R6; preview R9. |
 | S5 | Apply rolling-only repair through the same CLI and selection. Validate and replace each file atomically; prove mixed outcomes, preservation, repeated-run stability, counts, nonzero unresolved results, and a busy lock. | S4 supplies a verified CLI assessment and locking path. This slice adds actual persistence and must prove it separately. | Complete R5–R6 and apply R9; retain full-selection R2–R4. |
 
@@ -169,14 +210,14 @@ Preview and apply are separate independently usable behaviors. While only previe
 
 | Requirement | Current or provisional delivery | Verified evidence |
 | --- | --- | --- |
-| R1 | S1 representative tools path → S2 remaining tools variants → S3 envelope callers | S1/S2 tools paths verified; envelope callers unstarted |
+| R1 | S1 representative tools path → S2 remaining tools variants → S3 envelope callers | S1–S3 mining callers verified |
 | R2 | S1 bounded recognition → S2 full mining recognition → S4–S5 all-KB selection | S2 mining selection checks pass; all-KB selection remains later work |
-| R3 | S1 representative preservation and defaults → S2 remaining cases → S3–S5 reuse with boundary checks | S2 variant defaults, valid/custom fields, Unicode titles and body bytes verified |
-| R4 | S1 representative recovery → S2 remaining cases → S3–S5 reuse with boundary checks | S2 missing-source, code-example, date-range and unresolved-date behavior verified |
+| R3 | S1 representative preservation and defaults → S2 remaining cases → S3–S5 reuse with boundary checks | S1–S3 mining preservation/defaults verified; bulk assessment remains later work |
+| R4 | S1 representative recovery → S2 remaining cases → S3–S5 reuse with boundary checks | S1–S3 mining provenance verified; bulk assessment remains later work |
 | R5 | S4 preview CLI → S5 apply CLI; update help, README, prompts, and template with affected slices | None |
 | R6 | S4 proposed outcomes → S5 actual per-file persistence and mixed outcomes | None |
-| R7 | S1 tools serialization and checkpoint safety → S2 large-session coverage → S3 envelope isolation | S1 serialization and S2 real large-session checkpoint checked; envelope isolation unstarted |
-| R8 | S1 caught-failure restoration and fatal propagation → S2 remaining tools paths → S3 envelope paths | S2 normal/large rollback and full-sync large fatal stop verified |
+| R7 | S1 tools serialization and checkpoint safety → S2 large-session coverage → S3 envelope isolation | S1–S3 serialization/isolation and real checkpoints verified |
+| R8 | S1 caught-failure restoration and fatal propagation → S2 remaining tools paths → S3 envelope paths | S1–S3 actual-mutation recovery and full-sync fatal stops verified |
 | R9 | S4 preview lock → S5 apply lock | None |
 
 No dependency cycle exists in the proposed order: S1 → S2 → S3, S2 → S4, and S4 → S5. S4's placement after S3 is a sequence choice, not an invented blocking dependency. No requirement is considered complete merely because a shared helper exists.
@@ -192,9 +233,11 @@ No dependency cycle exists in the proposed order: S1 → S2 → S3, S2 → S4, a
 | Newly authorized fresh independent gate | PASSED after one pass; technical verdict ready | No supported material findings remain in the seven-file S1 scope; two extra real-child reviewer probes also passed. |
 | S2 focused, targeted race and `make check` | PASSED; 58 focused and 61 race events, zero failures/skips | Local normal/large tools variants, restoration and checkpoint boundaries. |
 | S2 fresh independent gate | PASSED in one pass; technical verdict ready | Seven hashes/origins verified; 33 independent pass events, no supported material findings. |
+| S3 focused, targeted race and `make check` | PASSED; 112 focused and 119 race events, zero failures/skips | Local normal/large/Codex envelope validity, checked markers, isolation and fatal propagation. |
+| S3 fresh independent gate | PASSED in one pass; technical verdict ready | 13 hashes/12 origins verified; 54 independent passes and one expected representative baseline failure. |
 
-The [evidence record](evidence/issue-2.md) retains S1's initial stopped gate and later passed fresh gate, plus S2's reproductions, local checks and passed fresh gate. S3–S5 remain unimplemented at this handoff.
+The [evidence record](evidence/issue-2.md) retains S1's initial stopped gate and later passed fresh gate, plus S2/S3's passed checks/gates and exact targets. S4/S5 remain unimplemented at this handoff.
 
-Current decision: retain committed S1 and verified S2, then reassess S3. Complete each authorized slice and its gate before starting the next. Verification is local and bounded; it does not establish deployed behavior or whole-PRD completion.
+Current decision: retain committed S1/S2 and verified S3, then reassess S4. Complete each authorized slice and its gate before starting the next. Verification is local and bounded; it does not establish deployed behavior or whole-PRD completion.
 
 After each verified slice, update this record's status and the PRD's delivery progress without changing accepted requirements. Reassess the provisional continuation before starting the next behavior.
