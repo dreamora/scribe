@@ -1,7 +1,7 @@
 # Issue #2: tools-mode rolling files
 
 Date: 2026-11-06
-Verdict: S1–S3 VERIFIED within their slice boundaries; S3 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
+Verdict: S1–S4 VERIFIED within their slice boundaries; S4 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
 Confidence: high
 
 Evidence applies to the named local checks and reviewer probes. The initial gate's directory-alias counterexample is retained below. The authorized correction passes matching regressions and the fresh independent gate. No deployed behavior or whole-PRD completion is claimed.
@@ -325,3 +325,83 @@ Fresh independent gate: **PASSED** after one independent pass, technical verdict
 The reviewer reconstructed `335cb44` plus all 388 pre-S3 baseline files and verified module/package origins. The representative check there produced one expected behavioral failure: invented dates and empty sources. Artifacts: `/private/tmp/scribe-issue2-s3-review/pass-1/{independent-focused.jsonl,independent-baseline-representative.jsonl,baseline-probe-origins.json,baseline-probe-package.json,target-hashes.json}`. The parent independently reconfirmed all 13 unchanged hashes, the 54 independent passes, and final full test/vet results. S1/S2 historical gates and commits remain separate. Retain verified S3 and reassess S4.
 
 The rolling-only recovery boundary excludes unrelated article output. Primary generation can already be in flight when a fatal error occurs; queued envelopes are discarded and workers drained before return. These local caught-failure checks do not prove crash recovery, external-mutator safety, deployed behavior, or whole-PRD completion. No S3 commit, installation, push, live KB or authenticated-model action ran.
+
+## S4: rolling-only CLI preview
+
+Date: 2026-11-06. Status: VERIFIED; focused/race/full local checks passed; fresh independent gate PASSED after one pass. S5 apply remains unstarted at this handoff. S1/S2 commits and the prior gates remain separate; no S4 commit was created.
+
+### Tried and findings
+
+The [S4 contract](../issue-2-rolling-frontmatter-plan.md#s4-explicit-rolling-only-repair-preview) adds an explicit read-only rolling assessment, preserving ordinary lint and the selected KB's existing sync coordination.
+
+- [`lint.go:35`](../../cmd/scribe/lint.go#L35) dispatches `--rolling-only` before other lint operations and legacy repair. It requires `--fix` and currently `--dry-run`; apply is explicitly unavailable until S5. Conflicting lint operations fail. [`lint.go:129`](../../cmd/scribe/lint.go#L129) keeps these preview/error paths from appending run records.
+- `lint_rolling.go` uses the shared rolling recognizer and byte-preserving proposal policy. Explicit paths retain normal filesystem argument semantics and must stay within selected content directories. `--changed` retains its existing precedence and scope. Full selection also includes marked files that the ordinary article walker omits, such as `_memory.md`.
+- Preview reports candidate counts as scanned, would repair, unchanged and unresolved. Mixed inputs report every result; unresolved files make the CLI exit nonzero without content replacement. Unsafe aliases, inaccessible inputs and invalid metadata remain unresolved. Stable selected-root aliases work, including explicit relative arguments.
+- [`lockfile.go:52`](../../cmd/scribe/lockfile.go#L52) writes bounded operation/PID details only after acquiring the existing inode's nonblocking lock. [`sync.go:107`](../../cmd/scribe/sync.go#L107) labels sync; preview labels itself. An unlabeled caller clears old details after acquiring the lock, so busy reporting does not reuse a released holder's identity. Unknown holder details are reported truthfully.
+
+The first production CLI subprocess rejected the unknown flag with exit 80. After the isolated dispatch it exits 0 with:
+
+```text
+would repair projects/acme/learnings.md
+scanned 1, would repair 1, unchanged 0, unresolved 0
+```
+
+The complete temporary-KB file/directory/hash comparison remained unchanged, including an unrelated duplicate artifact and absence of run records. This inspected representative preceded expanded selection and lock variants.
+
+Expanded checks first exposed omitted marked underscore files, silent alias omissions, rejected stable root-alias selectors, missing busy-owner details, and selection of an explicitly named non-Markdown file. Those regressions now pass. No model, duplicate-cleanup or legacy repair path supplies the preview result.
+
+### Check and observed output
+
+Tests execute the real production `main()` and Kong command path in a child test executable, with actual CLI arguments, exit codes, temporary KBs/Git and OS locks. The child startup harness replaces no selection, repair assessment, lock, output or persistence behavior. Guard executables prevent accidental Claude/Codex/qmd/ccrider calls. The helper entry test is excluded from focused selection; its CLI invocations are the proof boundary.
+
+All final Go commands use `GOCACHE=/private/tmp/scribe-issue2-go-cache`:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview)' -count=1 -json
+go test -race -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview)|^TestLint|^TestChangedWikiFiles|^TestKBLockScope|^TestLockPathFor|^TestAcquireLock|^TestMineSessionBatches_StopsAfterRateLimit$|^TestRecordSessionProcessed$|^TestApplyMetaRollingAppend_InitFrontmatterLintValid$' -count=1 -json
+make check
+```
+
+Focused: **passed**, 39 top-level tests plus 99 subtests = 138 pass events, zero failures/skips; package 13.933 seconds. Race: **passed**, 64 top-level tests plus 117 subtests = 181 pass events, zero failures/skips; package 24.353 seconds. Full `make check`: **passed**, exit 0:
+
+```text
+go test -tags "sqlite_fts5"  -count=1 -timeout 20m ./...
+ok  github.com/oliver-kriska/scribe/cmd/scribe  37.323s
+go vet -tags "sqlite_fts5" ./...
+```
+
+The full check used approved local-loopback listener access for existing hermetic `httptest` fixtures. No live network/model services were enabled.
+
+| Case | Local observation |
+| --- | --- |
+| D1 | Actual CLI exits 0, reports one proposed repair and leaves the complete fixture tree unchanged. No duplicate summary or run record appears. |
+| D2 | Full selected-KB preview includes standard/configured targets, yearly archives, untouched projects, Unicode marked files and a marked underscore file. Readable unrelated articles, raw content and non-Markdown files are excluded. Shared mining/default/provenance regressions remain green. |
+| D3 | Explicit arguments, duplicate arguments, tracked/untracked `--changed` files and its precedence pass. Outside-root paths fail before content assessment. Root aliases retain supported selection. |
+| D4 | Mixed preview reports `scanned 7, would repair 4, unchanged 1, unresolved 2` and exits nonzero. Malformed/false/confidence/calendar/contradictory/undated cases report causes and remain byte-identical. Code-only example dates do not supply provenance. |
+| D5 | Missing `--fix`, intermediate apply requests, duplicate-scan and model-operation combinations fail visibly without content writes. CLI help names the boundary. Ordinary `lint --fix --dry-run` retains its result and does not write content. |
+| D6 | Real cross-process flock contention reports operation/PID and preserves the held inode/details. Root aliases contend on the same lock; a different KB with the same lock directory proceeds. After a plain existing caller acquires, stale owner details are cleared and preview reports unavailable details. After release preview succeeds; no content changes occur. |
+
+Raw artifacts: `/private/tmp/scribe-issue2-s4-before-20261106/{representative-red.log,representative-green.log,expanded-red.log,expanded-green.log,markdown-filter-red.log,preview-green.log,preview-final-precheck.log,focused.jsonl,race.jsonl,make-check.log}`. A compile-only fixture import error was corrected before the successful representative; it is not product-failure evidence.
+
+### S4 target identity and preservation
+
+Baseline: `eb48423` plus verified S3 and preserved unrelated working edits. The scratch root retains all 425 source/module/document origins and hashes under `baseline/` and `baseline-hashes.json`. `target.patch` is the exact S4 delta against those origins; whole Git diff is not the review target. Six existing file origins and two new files form the frozen product target. Unrelated baseline source hashes remain unchanged.
+
+| S4 final file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/lint.go` | `eb07f092e6aae75d42509ba380f1c45fdba6b5f0c4538c688527fbd3d3d21ca2` |
+| `cmd/scribe/lint_rolling.go` | `0fb92a21c04ee88175bd4926044167d96dc0a8a4c7a50ade1a063c091563b8c0` |
+| `cmd/scribe/lockfile.go` | `a0808733b9b1631d241306731e2d0bc68de318078c5639e99bbe29ff216b1b62` |
+| `cmd/scribe/sync.go` | `de60c5bef96fc5debb6e231d87c46e690fddbc27f4cfc9b9f74a80210bf93f14` |
+| `cmd/scribe/issue2_rolling_preview_test.go` | `454b11e432dd140bf5872399b29556e267d6a2000f7c9293ef10dfa03c67de0a` |
+| `README.md` | `757cda827413bb568a8f8fae3e67896ead36ea24b2994ad15b8b4e8079d9086b` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `0601ca7e872c3624d9d543bc4dda9423aabac30340b57833747c8c4ab9631394` |
+| `cmd/scribe/skills/scribe-cli/SKILL.md` | `c07981110a7a6b5d640f4d09d98e5ce8c9e3cfa4a7ccc1724fa40be012c2bbbc` |
+
+### S4 gate and next decision
+
+Fresh independent gate: **PASSED** after one independent pass, technical verdict **ready**, no supported findings or testing gaps. The reviewer verified eight final hashes before/after, all 425 baseline file origins, six old/two new target origins, and the main Go module/package checkout origins. Of the baseline files, 415 non-target files were unchanged and four expected canonical documentation records were excluded from the product target.
+
+Independent command: `go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2RollingPreview' -count=1 -json`. Result: **26 passes, zero failures/skips, exit 0**, package 0.714 seconds. Raw artifact: `/private/tmp/scribe-issue2-s4-review/pass-1/independent-focused.jsonl`. The reviewer reused matching 138 focused/181 race passes and terminal full test/vet results; it did not claim independent baseline execution. The parent independently reconfirmed eight unchanged hashes and 26 independent passes. Retain verified S4 and reassess S5.
+
+This proves named local preview and coordination behavior. Apply/atomic replacement and repeated repair remain unimplemented for S5. Lock-file metadata is coordination state; fixture locks are outside KB content. Unknown owner details and unsupported aliases remain explicit. No live KB repair, installed binary, commit, push, or authenticated model action ran.

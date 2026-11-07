@@ -22,7 +22,8 @@ type LintCmd struct {
 	DryRun         bool    `help:"For --contradictions and --fix: preview without calling LLM / writing files." short:"n"`
 	OutputMD       string  `help:"For --contradictions: override the output markdown path." default:""`
 
-	Fix bool `help:"Deterministically repair frontmatter: missing tags/related/sources/confidence/domain/dates; normalize YYYY/MM/DD → YYYY-MM-DD; clamp a future created/updated to today; strip trailing whitespace. Never touches title/type. On a full run (no files / not --changed) also removes self-ingestion duplicate pages (foo.md.md, foo_md.md), collapses byte-identical duplicate pages, and removes paths with an unsubstituted {{VAR}} template placeholder — all git-recoverable."`
+	Fix         bool `help:"Ordinary repair (without --rolling-only): missing tags/related/sources/confidence/domain/dates; normalize YYYY/MM/DD → YYYY-MM-DD; clamp a future created/updated to today; strip trailing whitespace. Never touches title/type. On a full run (no files / not --changed) also removes self-ingestion duplicate pages (foo.md.md, foo_md.md), collapses byte-identical duplicate pages, and removes paths with an unsubstituted {{VAR}} template placeholder — all git-recoverable."`
+	RollingOnly bool `help:"With --fix --dry-run, preview only rolling-file metadata repair. Preserves body bytes and valid values; unresolved files and a busy sync lock return nonzero. Apply is not available yet."`
 
 	Resolve    bool `help:"Read wiki/_contradictions.md, weigh pairs by authority+updated+confidence, write proposals to wiki/_resolution-proposals.md. Never auto-applies — human reviews."`
 	Identities bool `help:"Detect same-person mentions across wiki + raw (emails, @handles, name variants) and write clustering proposals to wiki/_identity-proposals.md."`
@@ -32,6 +33,9 @@ type LintCmd struct {
 }
 
 func (l *LintCmd) Run() error {
+	if l.RollingOnly {
+		return l.runRollingOnly()
+	}
 	if l.Contradictions {
 		return runContradictionsCheck(l.Since, l.Max, l.DryRun, l.OutputMD)
 	}
@@ -121,6 +125,8 @@ func (l *LintCmd) Run() error {
 	}
 	return nil
 }
+
+func (l *LintCmd) ReadOnly() bool { return l.RollingOnly }
 
 // targetFiles resolves the lint scope: --changed → uncommitted wiki
 // files, explicit args → as given, otherwise every article on disk.

@@ -47,13 +47,19 @@ It fills missing metadata in standard and configured rolling targets under `proj
 It derives missing dates from dated entries and missing sources from explicit session references. It reports unresolved dates instead of inventing them.
 It preserves valid metadata and body bytes during repair. Unrecoverable output restores the session's rolling files and leaves the session pending.
 Untouched invalid regular files do not block mining. Malformed rolling metadata, explicit false markers on named targets, and invalid existing values require manual correction.
-If restoration fails, sync stops before later mining or commits. Bulk repair remains planned.
+If restoration fails, sync stops before later mining or commits. Applying bulk rolling repairs remains planned; a preview is available below.
 Restoration rejects symlink parent directories below the selected KB root, including in-KB links, before writes or removals.
 Configured KB-root aliases remain supported.
 
 Envelope mining uses the same rolling-file validity and restoration rules. Model generation can run in parallel; Go applies one session at a time and checkpoints only after validation and a persisted success marker.
 Failed envelope sessions restore their rolling changes and stay pending without removing a successful sibling's output. Codex rollout mining uses the same apply boundary and its separate processed log.
 Rolling metadata uses entry evidence; ordinary article normalization retains its existing behavior. A processed-log write failure also restores that session's rolling changes and does not count it as completed.
+
+Preview existing rolling-file repairs with `scribe lint --fix --rolling-only --dry-run`.
+It checks the selected KB, including untouched projects, configured targets, archives and marked files in content directories. It preserves all KB content and reports scanned, proposed repair, unchanged and unresolved counts with affected paths and causes.
+Unresolved files return a nonzero status. The preview takes the selected KB's sync lock without waiting; a busy result identifies the active operation and PID when available, otherwise says that holder details are unavailable.
+Use existing file arguments or `--changed` to limit scope. File arguments remain relative to the command's working directory or absolute, and must stay inside the selected KB's content directories. `--changed` keeps its existing precedence over file arguments.
+This mode requires `--fix` and currently also `--dry-run`; an apply request fails explicitly. It does not run duplicate cleanup. Ordinary `lint --fix` retains its existing behavior.
 
 Run `make check` for tests and vet. The live Codex test is opt-in:
 
@@ -923,6 +929,7 @@ scribe dream --hot          # daily mini consolidation of the busiest domain (au
 scribe lint         # frontmatter + size + orphan checks, incl. future or updated-before-created dates (grouped by class; closes with a "To fix, run:" footer; -v per-file, -q errors-only)
 scribe lint --contradictions # LLM pass for factual disagreements across articles
 scribe lint --fix            # deterministic frontmatter repair (weekly cron)
+scribe lint --fix --rolling-only --dry-run  # preview rolling metadata only; unresolved/busy returns nonzero
 scribe lint --duplicates     # no-LLM duplicate scan → wiki/_duplicates.md (report-only)
 scribe lint --resolve        # weigh contradiction pairs → wiki/_resolution-proposals.md (never auto-applies)
 scribe lint --identities     # alias-cluster proposals → wiki/_identity-proposals.md; --apply-identities applies them

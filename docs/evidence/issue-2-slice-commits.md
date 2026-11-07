@@ -19,3 +19,13 @@ Parent: `eb48423`. Candidate scratch: `/private/tmp/scribe-slice-commits-2026110
 - `make check`: exit 0; full package tests 36.049 seconds, then successful vet.
 
 All checks set `GOCACHE=/private/tmp/scribe-issue2-go-cache`, `GOPROXY=off`, `GOTOOLCHAIN=local`, and `GOWORK=off`. Go commands use `sqlite_fts5`; race adds `-race`. Focused selection includes S1/S2 tools tests, S3 envelope tests and the required collision safety tests. Race adds rate-limit, processed-marker and rolling-initialization regressions. Raw JSONL, full-check log and staging manifest are stored beside the candidate tree. Early scratch merge setup errors are not counted as product failures or successful checks.
+
+## S4: rolling-only repair preview
+
+S3 commit: `803fce1`. S4 parent: `803fce1`. Candidate scratch: `/private/tmp/scribe-slice-commits-20261108/s4/tree`. The S4 delta uses the preserved pre-S4 and pre-S5 snapshots; the intermediate apply refusal remains in this commit.
+
+- Focused: 141 passing named outcomes, zero failures/skips; package 11.199 seconds.
+- Targeted race: 182 passing named outcomes, zero failures/skips; package 24.786 seconds.
+- `make check`: exit 0; full package tests 38.681 seconds, then successful vet.
+
+The focused selection covers all issue #2 fixtures and collision safety. Race also selects ordinary lint, lock identity/acquisition, rate-limit, marker and initialization regressions. The environment and raw artifact layout follow S3 above.

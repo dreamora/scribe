@@ -3,7 +3,10 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -33,7 +36,46 @@ func acquireLock(lockPath string) (f *os.File, ok bool, err error) {
 		}
 		return nil, false, err
 	}
+	// An unlabeled caller must not inherit a previous holder's identity.
+	if err := f.Truncate(0); err != nil {
+		releaseLock(f)
+		return nil, false, err
+	}
 	return f, true, nil
+}
+
+type lockOwner struct {
+	Operation string `json:"operation"`
+	PID       int    `json:"pid"`
+}
+
+func acquireOperationLock(path, operation string) (*os.File, bool, error) {
+	f, ok, err := acquireLock(path)
+	if err != nil || !ok {
+		return f, ok, err
+	}
+	data, err := json.Marshal(lockOwner{Operation: operation, PID: os.Getpid()})
+	if err == nil {
+		_, err = f.WriteAt(append(data, '\n'), 0)
+	}
+	if err != nil {
+		releaseLock(f)
+		return nil, false, err
+	}
+	return f, true, nil
+}
+
+func lockOwnerDetails(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return "an active operation (holder details unavailable)"
+	}
+	defer f.Close()
+	var owner lockOwner
+	if err := json.NewDecoder(io.LimitReader(f, 4096)).Decode(&owner); err != nil || owner.Operation == "" || owner.PID <= 0 {
+		return "an active operation (holder details unavailable)"
+	}
+	return fmt.Sprintf("%s (pid %d)", owner.Operation, owner.PID)
 }
 
 // releaseLock releases the advisory lock and closes the file. Safe to defer.

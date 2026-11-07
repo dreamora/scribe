@@ -109,7 +109,7 @@ func (s *SyncCmd) Run() error {
 	// sync read this to decide whether to back off.
 	if !s.DryRun {
 		lockPath := lockPathFor(cfg.LockDir, "sync", root)
-		lf, ok, lerr := acquireLock(lockPath)
+		lf, ok, lerr := acquireOperationLock(lockPath, "sync")
 		if lerr != nil {
 			return fmt.Errorf("lock %s: %w", lockPath, lerr)
 		}

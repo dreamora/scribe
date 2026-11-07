@@ -2,7 +2,7 @@
 
 Status: confirmed
 
-Implementation: S1–S3 are VERIFIED within their mining slice boundaries. Their fresh independent gates each PASSED after one pass; the initial S1 gate remains historically BLOCKED. S4/S5 remain unimplemented in the authorized sequential workflow.
+Implementation: S1–S4 are VERIFIED within their slice boundaries. Their fresh independent gates each PASSED after one pass; the initial S1 gate remains historically BLOCKED. S5 apply remains unimplemented.
 
 Decision sources: [issue #2](https://github.com/dreamora/scribe/issues/2), the [glossary](domain-model/GLOSSARY.md), the ADRs below, and the design interview in this chat.
 
@@ -69,7 +69,7 @@ Source and state: **confirmed**, Q7 and Q10; ADR 0002.
 
 Add `--rolling-only` to the existing lint repair command. Require `--fix`. Preserve existing file selectors and `--changed`; apply the rolling-file filter within the selected scope.
 
-These are target interfaces, not currently verified commands:
+Preview is verified under S4. Apply remains a target interface for S5:
 
 ```sh
 scribe lint --fix --rolling-only --dry-run
@@ -124,7 +124,7 @@ These requirements define the destination, not an implementation sequence. Use `
 
 **Inspected contracts:** the ticket, glossary, four ADRs, mode defaults, tools-mode success handling, and lint repair. The [S1 evidence](evidence/issue-2.md) records executed normal tools-mode checks and three existing regressions. The existing `TestApplyMetaRollingAppend_InitFrontmatterLintValid` checks one new envelope rolling file. It does not establish the new envelope transaction or repair command.
 
-**Required verification matrix:** S1–S3 supply verified local mining evidence. Bulk-repair cases remain unexecuted.
+**Required verification matrix:** S1–S4 supply verified local mining/preview evidence. Actual bulk-repair cases remain unexecuted for S5.
 
 | Boundary | Required evidence |
 | --- | --- |
@@ -146,6 +146,6 @@ Excluded: process-crash recovery, restoration of unrelated article output, file-
 
 ## Delivery links and status
 
-Track the defect in [issue #2](https://github.com/dreamora/scribe/issues/2). The [slice plan](issue-2-rolling-frontmatter-plan.md) records verified S1–S3 and the sequential continuation. [Evidence](evidence/issue-2.md) retains historical gates plus each target and observed checks. S3 completes envelope/Codex integration for mining R1, R7–R8 and retains R2–R4. All-KB repair, R5–R6 and R9 remain unimplemented in S4/S5. No whole-PRD completion claim is supported.
+Track the defect in [issue #2](https://github.com/dreamora/scribe/issues/2). The [slice plan](issue-2-rolling-frontmatter-plan.md) records verified S1–S4 and the sequential continuation. [Evidence](evidence/issue-2.md) retains historical gates plus each target and observed checks. S4 completes preview assessment for R2–R4 and preview R5–R6/R9. Actual repair, per-file atomic replacement and apply coordination remain unimplemented in S5. No whole-PRD completion claim is supported.
 
 The initial gate stopped on 2026-11-06 after three consecutive passes produced material findings. A later explicit user request authorized bounded directory-alias rejection, S1 checks, and a fresh gate. The fresh gate passed after one independent pass with technical verdict ready and no supported material findings. S1 is verified within its slice boundary. The user subsequently authorized S2–S5 sequentially; each requires reassessment before implementation and verification before the next slice.
