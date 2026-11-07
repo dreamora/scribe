@@ -188,10 +188,6 @@ func rollingRestorePath(root, rel string) (string, error) {
 	}
 }
 
-func runToolsRollingSession(root string, run func() error) error {
-	return runRollingSession(root, run, nil)
-}
-
 func runRollingSession(root string, run, complete func() error) error {
 	before, err := captureRollingState(root)
 	if err != nil {

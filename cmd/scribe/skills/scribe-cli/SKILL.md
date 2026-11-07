@@ -81,7 +81,8 @@ blocks the real cron job. Everything else here is safe to run interactively.
 | Approve/ignore discovered repos | `scribe projects review` |
 | Absorb a local file or URL | `scribe absorb <file>` / `scribe ingest url <url> --absorb` |
 | Fix frontmatter errors | `scribe lint --fix` |
-| Preview rolling metadata repairs without content writes | `scribe lint --fix --rolling-only --dry-run` (apply unavailable; unresolved files or busy sync lock return nonzero) |
+| Preview rolling metadata repairs without content writes | `scribe lint --fix --rolling-only --dry-run` (unresolved files or busy sync lock return nonzero) |
+| Apply rolling metadata repairs | `scribe lint --fix --rolling-only` (validates and replaces each file atomically; unresolved files stay unchanged and return nonzero) |
 | Work the lint content queue | → hand off to the **scribe-kb-tidy** skill |
 | Author/search KB content | → hand off to the **scribe-kb** skill |
 | Check LLM spend | `scribe cost` |

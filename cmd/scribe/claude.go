@@ -135,7 +135,7 @@ func realRunClaude(ctx context.Context, root, prompt, model string, tools []stri
 	args = append(args, "--output-format", "json")
 	if len(tools) > 0 {
 		// Belt-and-suspenders on the second pair: Go owns
-		// wiki/_sessions_log.json (recordSessionProcessed); deny the model
+		// wiki/_sessions_log.json (applyMetaSessionsLogAppend); deny the model
 		// write access to it so a stray model write can't race Go's writer.
 		// A Write() rule is silently ignored, so the rule must be spelled
 		// Edit(); deny wins over allow. cmd.Dir is root (set below), so this

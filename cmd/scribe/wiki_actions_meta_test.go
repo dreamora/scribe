@@ -32,7 +32,9 @@ func TestApplyMetaSessionsLogAppend(t *testing.T) {
 		t.Fatal("model-supplied sessions_log_append must not touch wiki/_sessions_log.json")
 	}
 	// The Go-side writer is the only path.
-	recordSessionProcessed(root, "abc-123")
+	if err := applyMetaSessionsLogAppend(root, MetaAction{Op: "sessions_log_append", SessionID: "abc-123"}, ApplyOptions{}); err != nil {
+		t.Fatalf("Go-side marker write: %v", err)
+	}
 	data, err := os.ReadFile(filepath.Join(root, "wiki", "_sessions_log.json"))
 	if err != nil {
 		t.Fatalf("read sessions log: %v", err)
@@ -44,7 +46,7 @@ func TestApplyMetaSessionsLogAppend(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if _, ok := got.Processed["abc-123"]; !ok {
-		t.Fatalf("session not recorded by recordSessionProcessed: %s", string(data))
+		t.Fatalf("session not recorded by checked Go writer: %s", string(data))
 	}
 }
 

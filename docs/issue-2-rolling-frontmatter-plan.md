@@ -1,12 +1,12 @@
 # Issue #2: rolling-file validity slice plan
 
-Status: S1–S4 verified; S5 reassessment
+Status: S1–S5 locally verified; R1–R9 audit complete
 
 Intent: [confirmed PRD](issue-2-rolling-frontmatter-prd.md). Its requirements and acceptance results remain authoritative.
 
 Execution permission: The user authorized local S1 implementation on 2026-11-05, then the JEP-3 correction and fresh gate on 2026-11-06. The user subsequently requested the S1 commit and sequential reassessment, implementation, checks, and bounded independent gates for S2–S5. Tracker writes, live KB repair, installation, pushes, and publication remain unauthorized.
 
-Current slice: S5 reassessment. S1–S4 are VERIFIED within their slice boundaries. Each fresh independent gate PASSED after one pass with technical verdict ready and no supported material findings. The initial three-pass S1 gate remains historically BLOCKED. S5 remains unimplemented and provisional until reassessed. S1/S2 were committed separately as `335cb44` and `eb48423`.
+Completed slices: S1–S5 are VERIFIED locally. Fresh S1–S4 gates each PASSED after one pass; expanded S5 PASSED after two passes with latest technical verdict ready and no supported findings/testing gaps. The current R1–R9 audit is complete with no open material gaps. The initial three-pass S1 gate remains historically BLOCKED. S1/S2 were committed separately as `335cb44` and `eb48423`. All five slices now have separate local commits; see the [commit verification](evidence/issue-2-slice-commits.md).
 
 ## Inspection and task boundary
 
@@ -209,7 +209,7 @@ Scope: preview R5/R6/R9, with R2–R4 across the complete chosen scope, includin
 
 Preview reports scanned, proposed repair, unchanged and unresolved counts, affected paths and causes. Scanned counts candidates assessed after the rolling filter, including unresolved input candidates; unrelated readable articles are excluded. File bytes remain unchanged, including valid/custom fields and body whitespace. Mixed repairable/unresolved input still reports all outcomes and returns nonzero. Preview takes the selected KB's existing sync lock without waiting. The current lock has no operation metadata; add bounded operation/PID details on the held inode after acquisition so busy results can identify sync or rolling preview, preserving existing lock identities/callers and nonblocking behavior.
 
-S5 apply remains excluded. Until S5 passes its own slice, a rolling-only apply request must fail explicitly before legacy repair or duplicate cleanup. Reject combinations with other lint operations. This intermediate containment does not change the confirmed final interface. Failed/preview rolling-only commands do not append run records or otherwise modify KB content; lock metadata outside KB content is the expected coordination effect.
+During S4, actual apply was excluded and failed explicitly before legacy repair or duplicate cleanup. S5 below replaces that intermediate guard with actual persistence. Reject combinations with other lint operations. This containment does not change the confirmed final interface. S4 failed/preview commands do not append run records or otherwise modify KB content; lock metadata outside KB content is the expected coordination effect.
 
 ### Build and proof
 
@@ -238,7 +238,53 @@ Revise: preview writes content, omits a selected rolling file, enters legacy cle
 
 Stop: a confirmed product decision cannot be preserved, safe subprocess/lock isolation is unavailable, or unrelated work cannot be preserved. Expose the gap; do not claim S4 verified or start S5.
 
-## Provisional continuation
+## S5: apply rolling-only repairs independently per file
+
+Status: VERIFIED; expanded local checks passed, independent gate PASSED after two passes, and final R1–R9 audit complete. Final audit initially reopened completion for AUDIT-1; its correction is independently discriminated and closed. Complete pre-S5 source/module/document origins at `eb48423` plus verified S3/S4 and preserved unrelated changes: `/private/tmp/scribe-issue2-s5-before-20261106/{baseline/,baseline-hashes.json}`. The correction baseline is `/private/tmp/scribe-issue2-audit1-before-20261106/{baseline/,baseline-hashes.json}`.
+
+### Aim and boundary
+
+Outcome: `scribe lint --fix --rolling-only` repairs valid selected candidates atomically per file. Unresolved candidates remain unchanged, independent repairable siblings still succeed, and mixed failures return nonzero with correct paths/causes/counts. Preview remains available with no content writes.
+
+Question: Can S4's shared assessment/selection/lock path add actual persistence without crossing legacy duplicate cleanup, losing body or valid metadata, or counting a failed replacement as a repair? Reuse S2's validated proposal and the existing same-directory atomic writer. Preserve file modes and recheck supported paths before writes. Keep one shared preview/apply loop; do not add an all-KB transaction or change ordinary lint.
+
+Depends on S4's verified explicit/changed/full selection, containment, proposed counts, nonblocking sync lock/holder reporting and real CLI harness; S1–S3 provide verified mining behavior and shared policy. Remove only the intermediate apply refusal and its now-superseded test assertion. Apply must still require `--fix`, reject conflicting lint operations, and never enter legacy cleanup. Keep alias and selected-root rules, metadata/provenance defaults, valid/custom values and exact body bytes unchanged. Operational run records may be written for real apply, following the existing CLI convention; preview and invalid no-fix requests remain read-only.
+
+Scope: finish R5/R6 and apply R9 while preserving R1–R4/R7–R8. Reuse all selected standard/configured targets, yearly archives and marked content files, including untouched projects. Each proposal must pass validation before atomic replacement. Count repaired only after replacement succeeds; report unchanged and unresolved independently. Do not add crash recovery, unrelated article rollback, live repair, install, commit or publication.
+
+### Build and proof
+
+First execute a real representative CLI apply, inspect persisted metadata/date/source/body bytes and atomic inode replacement, then record the observation before expanding to mixed outcomes and faults.
+
+Representative observation, 2026-11-06: `TestIssue2RollingApplyRepresentative` first failed on S4's explicit apply refusal. The completed CLI now exits 0 and reports `scanned 1, repaired 1, unchanged 0, unresolved 0`. Inspected persisted output contains the expected 2026-10-01/2026-11-01 dates/source and complete defaults, preserves contributor/custom/high-confidence values and exact body bytes, retains mode 0600 and replaces the inode through the atomic writer. Unrelated duplicates, placeholders and processed-log bytes remain unchanged; normal apply telemetry is present. Decision: retain this path and expand mixed outcomes, write faults, selectors, locks and repeated-run proof. Raw representative red/green logs are in the pre-S5 scratch root.
+
+Initial local observation: E1–E5 passed, including real temporary-write failure with valid sibling continuation, repeated apply stability, exact mode under a private umask and complete busy-state preservation. Focused checks passed 153 events, targeted race checks passed 196 events, zero failures/skips; `make check` passed tests and vet. [S5 evidence](evidence/issue-2.md#s5-per-file-rolling-repair-apply) retains those exact commands, failures/limits and the historical eight-file target. That target then passed its initial review before the full audit reopened completion below.
+
+Post-gate audit observation: S5's first review passed with 41 independent outcomes, but final whole-current inspection found **AUDIT-1 (P2)**. Tools-mode marker persistence was a void degraded log after the count/batch increment, permitting unmatched-marker checkpoints. This required R1/R7/R8 completion/recovery correction; it did not require a new product decision. The correction and refreshed review below close it.
+
+Bounded correction contract: first reproduce normal/large real-child mutations with a malformed processed log. Observe changed existing and new rolling files before releasing child success. Require zero completed sessions, exact rolling restoration/removal, preserved damaged-log bytes, pending markers and unchanged real Git/checkpoint state. Then use `runRollingSession` with the checked `applyMetaSessionsLogAppend` completion callback, removing the redundant later void mark. Remove a wrapper only if it loses its production role, updating its existing tests without dropping assertions. Re-run the complete original S5 scope plus this correction and retain all earlier checks before refreshed parent review over the whole expanded target. Do not claim R1–R9 complete until that review and final audit pass.
+
+Correction observation: both prompt families first reproduced `mined=2`, retained rolling output and an unmatched-marker Git checkpoint. The checked shared completion now restores/removes rolling output, preserves damaged control bytes, reports zero completion and leaves HEAD/staging unchanged. Both obsolete test-only wrappers were removed and existing ownership/idempotence assertions retained on the checked primitive. Expanded focused checks passed 156 events, race checks passed 200 events, zero failures/skips; full tests (38.247 seconds) and vet passed. The expanded 14-file S5 target retains the original eight and still uses the original 427-file pre-S5 origins. Refreshed review passed with 46 independent outcomes and mechanically discriminating baseline probes. The final R1–R9 audit passed; ordinary post-review comment/failure-message synchronization has a separate exact readback and final 15-file identity in the evidence.
+
+| Case | Required observation |
+| --- | --- |
+| E1: representative apply | Production CLI exits 0, reports one actual repair, persists complete valid metadata from entry evidence, preserves body/custom fields and original file mode, and uses atomic replacement. |
+| E2: complete selection and selectors | Apply reuses verified preview selection for standard/configured targets, archives, marked files and untouched projects. Explicit/changed scopes, root aliases and non-Markdown/ordinary exclusions remain valid. |
+| E3: mixed outcomes and idempotence | A repairable, unchanged and unresolved file produce correct independent counts, nonzero unresolved status, repaired valid sibling and byte-identical unresolved/original valid files. Repeating apply makes no further article changes; preview after apply proposes none. Duplicate/placeholder/unrelated files remain intact. |
+| E4: write fault | Force a caught real filesystem write failure in a child CLI without privileged permissions or a mocked writer. A large candidate's temporary write fails under a child-only file-size limit while a smaller sibling still repairs. Preserve failed original bytes, remove temporary output, count failure unresolved and return nonzero. |
+| E5: lock/interface compatibility | Preview and apply contend on the same actual sync lock, identify the holder, return nonzero promptly and leave content unchanged when busy. Missing `--fix`, conflicting operations and unsupported selectors remain contained. Ordinary lint and preview retain their contracts. |
+
+Run the representative discrimination before the product fix and inspect its resulting file before expanding. The write-fault harness lowers only the fixture child's file-size resource limit and ignores SIGXFSZ so the real writer returns a caught error; no production fault seam is added. Final validation: focused S1–S5, targeted race/ordinary lint/lock regressions, then required `make check`. Synchronize help, README, template and embedded CLI skill. Freeze the exact product delta for the parent's fresh independent gate; no nested gate.
+
+### Decision rule and completion audit
+
+Continue: E1–E5 pass, focused/race/full checks pass and the fresh independent gate passes. Retain S5, then audit each confirmed R1–R9 against named observed boundaries and update the PRD/plan/evidence without broadening the claim beyond local proof.
+
+Revise: a replacement changes body/valid metadata, unresolved bytes change, a failed file blocks valid siblings, counts claim a failed write, repeated repair churns articles, or preview/locking/legacy isolation regresses. Correct within S5 and repeat affected proof.
+
+Stop: a confirmed decision cannot be preserved, safe local fault/lock isolation is unavailable, or unrelated work cannot be preserved. Expose the gap and do not claim full PRD completion.
+
+## Slice sequence
 
 These are outcomes and dependency edges, not implementation tickets. Refine only the next selected slice after inspecting its predecessor's evidence. Execute serially; the slices share state and code.
 
@@ -247,23 +293,23 @@ These are outcomes and dependency edges, not implementation tickets. Refine only
 | S2 | VERIFIED under the contract above; fresh gate PASSED in one pass. | S1 supplies subprocess change assessment, valid completion, restoration, and fatal-stop behavior. | Tools-mode R1, R3–R4, R7–R8 and R2 mining recognition. |
 | S3 | VERIFIED under C1–C6; fresh gate PASSED in one pass. | S2 supplies selection/metadata policy; S1 supplies caught-failure recovery. The single apply coordinator supplies envelope isolation while generation stays parallel. | Mining R1, R7–R8 and retained R2–R4. |
 | S4 | VERIFIED under D1–D6; fresh gate PASSED in one pass. | S2 supplies selection/metadata assessment; verified S3 supplies the authorized sequence. | R2–R4 across preview selection; preview R5–R6/R9. |
-| S5 | Apply rolling-only repair through the same CLI and selection. Validate and replace each file atomically; prove mixed outcomes, preservation, repeated-run stability, counts, nonzero unresolved results, and a busy lock. | S4 supplies a verified CLI assessment and locking path. This slice adds actual persistence and must prove it separately. | Complete R5–R6 and apply R9; retain full-selection R2–R4. |
+| S5 | VERIFIED under E1–E5, AUDIT-1 correction and final acceptance audit; gate PASSED after two passes. | S4 supplies verified assessment/selection/locking. S5 adds actual per-file atomic replacement and closes checked tools-marker completion. | R5–R6 and apply R9; retained R1–R4/R7–R8, all R1–R9 locally verified. |
 
-Preview and apply are separate independently usable behaviors. While only preview is implemented, an apply request must fail explicitly instead of falling through to legacy repair or duplicate cleanup. This is an intermediate containment rule, not a change to the final PRD interface.
+Preview and apply are separate independently usable behaviors. During S4, apply failed explicitly instead of entering legacy cleanup. S5 replaces that intermediate guard with actual per-file repair; the final PRD interface is unchanged.
 
 ## Requirement accounting
 
-| Requirement | Current or provisional delivery | Verified evidence |
+| Requirement | Delivered boundary | Verified evidence |
 | --- | --- | --- |
-| R1 | S1 representative tools path → S2 remaining tools variants → S3 envelope callers | S1–S3 mining callers verified |
-| R2 | S1 bounded recognition → S2 full mining recognition → S4–S5 all-KB selection | S4 preview selection verified; apply remains S5 |
-| R3 | S1 representative preservation and defaults → S2 remaining cases → S3–S5 reuse with boundary checks | S1–S4 assessment/preservation verified; actual bulk replacement remains S5 |
-| R4 | S1 representative recovery → S2 remaining cases → S3–S5 reuse with boundary checks | S1–S4 provenance verified; actual bulk replacement remains S5 |
-| R5 | S4 preview CLI → S5 apply CLI; update help, README, prompts, and template with affected slices | S4 preview verified; apply unstarted |
-| R6 | S4 proposed outcomes → S5 actual per-file persistence and mixed outcomes | S4 mixed preview verified; persistence unstarted |
-| R7 | S1 tools serialization and checkpoint safety → S2 large-session coverage → S3 envelope isolation | S1–S3 serialization/isolation and real checkpoints verified |
-| R8 | S1 caught-failure restoration and fatal propagation → S2 remaining tools paths → S3 envelope paths | S1–S3 actual-mutation recovery and full-sync fatal stops verified |
-| R9 | S4 preview lock → S5 apply lock | S4 preview coordination verified; apply unstarted |
+| R1 | All tools/envelope normal/large callers and separate Codex completion | VERIFIED; repaired/validated before checked markers; AUDIT-1 closes tools-marker failure. |
+| R2 | Mining recognition and full/explicit/changed bulk selection | VERIFIED; standards/configuration/archives/marked files, malformed/false conflicts and ordinary exclusions. |
+| R3 | Shared missing-field policy at real mining/CLI boundaries | VERIFIED; exact defaults, Unicode titles, valid/custom/contributor values and body bytes preserved. |
+| R4 | Entry evidence, preserved dates/sources and unresolved rejection | VERIFIED; newest-first range, excluded code examples, empty source list and contradictory dates. |
+| R5 | Real preview/apply CLI, selectors and synchronized documentation | VERIFIED; --fix required, --changed precedence, no duplicate cleanup, ordinary lint retained. |
+| R6 | Validated atomic per-file replacement | VERIFIED; mixed outcomes, real caught temporary-write failure, counts/causes, modes and idempotence. |
+| R7 | Serial tools/apply/checkpoint phases with parallel envelope generation | VERIFIED; overlapping generation and successful sibling's real checkpoint, no invalid/unmatched-marker checkpoint. |
+| R8 | Rolling-only restoration and fatal stop | VERIFIED; observed mutation, old/new restoration, pending markers, full-sync staging/commit suppression on failed restoration. |
+| R9 | Same selected-KB sync lock for both commands | VERIFIED; active-operation busy errors, nonblocking refusal and complete KB preservation; root aliases retain identity. |
 
 No dependency cycle exists in the proposed order: S1 → S2 → S3, S2 → S4, and S4 → S5. S4's placement after S3 is a sequence choice, not an invented blocking dependency. No requirement is considered complete merely because a shared helper exists.
 
@@ -282,9 +328,14 @@ No dependency cycle exists in the proposed order: S1 → S2 → S3, S2 → S4, a
 | S3 fresh independent gate | PASSED in one pass; technical verdict ready | 13 hashes/12 origins verified; 54 independent passes and one expected representative baseline failure. |
 | S4 focused, targeted race and `make check` | PASSED; 138 focused and 181 race events, zero failures/skips | Local real-CLI preview, complete scope, containment, counts and sync coordination. |
 | S4 fresh independent gate | PASSED in one pass; technical verdict ready | Eight hashes/425 baseline origins verified; 26 independent passes, no supported findings/testing gaps. |
+| S5 focused, targeted race and `make check` | PASSED; 153 focused and 196 race events, zero failures/skips | Actual apply, independent mixed/write failures, unchanged unresolved bytes and repeated repair. |
+| S5 initial independent gate | PASSED in one pass; technical verdict ready | Historical eight-file target; final audit then reopened completion for AUDIT-1. |
+| AUDIT-1 expanded S5 local checks | PASSED; 156 focused and 200 race events, full test/vet exit 0 | Both tools marker-failure cases discriminate the prior unmatched-marker checkpoint. |
+| Refreshed S5 pass 2 | PASSED; latest technical verdict ready | Full 14-file target/origins verified; 46 independent pass events and expected baseline marker/apply failures. |
+| Final current R1–R9 audit and prose readback | PASSED locally; no open material gaps | Named current source/tests/outcomes in evidence; separate comment-only synchronization adds one file without executable changes. |
 
-The [evidence record](evidence/issue-2.md) retains historical gates and passed local/independent results through S4. S5 remains unimplemented at this handoff.
+The [evidence record](evidence/issue-2.md#current-r1r9-completion-audit) retains historical gates, current acceptance outcomes and exact reviewed/final targets. All required local checks, the expanded S5 gate and the final current requirement audit passed.
 
-Current decision: retain committed S1/S2 and verified S3/S4, then reassess S5. Complete each authorized slice and its gate before starting the next. Verification is local and bounded; it does not establish deployed behavior or whole-PRD completion.
+Current decision: retain the five verified local slice commits. The confirmed PRD's local implementation and verification are complete. Deployment, live KB repair and other excluded operations remain unperformed.
 
 After each verified slice, update this record's status and the PRD's delivery progress without changing accepted requirements. Reassess the provisional continuation before starting the next behavior.

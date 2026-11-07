@@ -855,7 +855,7 @@ func applyMetaAction(root string, m MetaAction, opts ApplyOptions) error {
 	case "sessions_log_append":
 		// Accepted for compatibility (prompts and local models still emit
 		// it) but never applied: Go records the session it actually mined
-		// (recordSessionProcessed), so a transcript cannot mark OTHER
+		// through its checked completion callback, so a transcript cannot mark OTHER
 		// session ids as processed and get them skipped forever.
 		return nil
 	case "rolling_memory_append":
@@ -923,8 +923,8 @@ func applyMetaLogAppend(root string, m MetaAction, opts ApplyOptions) error {
 	return nil
 }
 
-// applyMetaSessionsLogAppend is the Go-side writer behind
-// recordSessionProcessed; applyMetaAction no longer routes the model's
+// applyMetaSessionsLogAppend is the checked Go-side completion writer;
+// applyMetaAction no longer routes the model's
 // sessions_log_append here. It records one session ID under
 // wiki/_sessions_log.json's `processed` map. The Phase 4C envelope
 // replaces the previous "Claude writes the file" approach; centralizing
@@ -1179,6 +1179,14 @@ var errUnknownTopDir = errors.New("path outside known wiki dirs")
 // pointed at outside the KB. O_EXCL refuses to open through any existing
 // name, symlink included, and the random suffix removes the guess.
 func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
+	return writeFileAtomicMode(path, content, mode, false)
+}
+
+func replaceFileAtomic(path string, content []byte, mode os.FileMode) error {
+	return writeFileAtomicMode(path, content, mode, true)
+}
+
+func writeFileAtomicMode(path string, content []byte, mode os.FileMode, exactMode bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir parent: %w", err)
 	}
@@ -1189,6 +1197,13 @@ func writeFileAtomic(path string, content []byte, mode os.FileMode) error {
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return fmt.Errorf("write tmp: %w", err)
+	}
+	if exactMode {
+		if err := f.Chmod(mode); err != nil {
+			f.Close()
+			_ = os.Remove(tmp)
+			return fmt.Errorf("set tmp mode: %w", err)
+		}
 	}
 	if _, err := f.Write(content); err != nil {
 		f.Close()

@@ -2,7 +2,7 @@
 
 Status: confirmed
 
-Implementation: S1–S4 are VERIFIED within their slice boundaries. Their fresh independent gates each PASSED after one pass; the initial S1 gate remains historically BLOCKED. S5 apply remains unimplemented.
+Implementation: S1–S5 are VERIFIED locally. The current requirement-by-requirement R1–R9 audit is complete with no open material gaps; see the [acceptance evidence](evidence/issue-2.md#current-r1r9-completion-audit). Fresh S1–S4 gates each PASSED after one pass. The expanded S5 gate PASSED after two passes, including the AUDIT-1 checked tools-marker correction. The initial S1 gate remains historically BLOCKED. Deployment and live KB repair are not established.
 
 Decision sources: [issue #2](https://github.com/dreamora/scribe/issues/2), the [glossary](domain-model/GLOSSARY.md), the ADRs below, and the design interview in this chat.
 
@@ -69,7 +69,7 @@ Source and state: **confirmed**, Q7 and Q10; ADR 0002.
 
 Add `--rolling-only` to the existing lint repair command. Require `--fix`. Preserve existing file selectors and `--changed`; apply the rolling-file filter within the selected scope.
 
-Preview is verified under S4. Apply remains a target interface for S5:
+Preview and apply are locally verified under S4–S5:
 
 ```sh
 scribe lint --fix --rolling-only --dry-run
@@ -122,9 +122,9 @@ These requirements define the destination, not an implementation sequence. Use `
 
 ## Verification
 
-**Inspected contracts:** the ticket, glossary, four ADRs, mode defaults, tools-mode success handling, and lint repair. The [S1 evidence](evidence/issue-2.md) records executed normal tools-mode checks and three existing regressions. The existing `TestApplyMetaRollingAppend_InitFrontmatterLintValid` checks one new envelope rolling file. It does not establish the new envelope transaction or repair command.
+**Inspected contracts:** the ticket, glossary, four ADRs, mode defaults, tools/envelope/Codex completion and fatal propagation, rolling selection/metadata assessment, lint CLI persistence and lock coordination. [Evidence](evidence/issue-2.md) records executed slice checks, independent gates and the whole-current acceptance audit. The evidence distinguishes current integrated behavior from older narrow helper checks.
 
-**Required verification matrix:** S1–S4 supply verified local mining/preview evidence. Actual bulk-repair cases remain unexecuted for S5.
+**Completed verification matrix:** S1–S5 supply verified local mining, preview and actual-repair evidence. The [current R1–R9 audit](evidence/issue-2.md#current-r1r9-completion-audit) maps every requirement to inspected source boundaries, named passing tests and observed outcomes, including the independently discriminated AUDIT-1 correction.
 
 | Boundary | Required evidence |
 | --- | --- |
@@ -140,12 +140,12 @@ Investigation hints, not normative file ownership: `sync_sessions.go`, `session_
 
 ## Exclusions and open decisions
 
-No current requirement is blocked by an unresolved product decision. Selection, defaults, repair, concurrency, and caught-failure behavior are confirmed. Implementation mechanisms and their evidence remain to be established.
+No current requirement is blocked by an unresolved product decision or known material implementation gap. Selection, defaults, repair, concurrency and caught-failure behavior are confirmed and locally verified within the evidence limits.
 
 Excluded: process-crash recovery, restoration of unrelated article output, file-location migration, generic metadata correction, automatic bulk repair during mining, and changes to ordinary lint cleanup. Editing a live KB, changing schedules, installing a binary, or publishing a release requires separate execution authorization.
 
 ## Delivery links and status
 
-Track the defect in [issue #2](https://github.com/dreamora/scribe/issues/2). The [slice plan](issue-2-rolling-frontmatter-plan.md) records verified S1–S4 and the sequential continuation. [Evidence](evidence/issue-2.md) retains historical gates plus each target and observed checks. S4 completes preview assessment for R2–R4 and preview R5–R6/R9. Actual repair, per-file atomic replacement and apply coordination remain unimplemented in S5. No whole-PRD completion claim is supported.
+Track the defect in [issue #2](https://github.com/dreamora/scribe/issues/2). The [slice plan](issue-2-rolling-frontmatter-plan.md) records verified S1–S5. [Evidence](evidence/issue-2.md) retains historical gates, exact targets and observed checks. All R1–R9 acceptance boundaries are implemented and locally verified, including actual per-file repair and checked tools/envelope session completion. All five slices have separate local commits; the [commit verification](evidence/issue-2-slice-commits.md) records the isolated checks. S1/S2 remain `335cb44` and `eb48423`. No live repair, installation or publication was performed.
 
 The initial gate stopped on 2026-11-06 after three consecutive passes produced material findings. A later explicit user request authorized bounded directory-alias rejection, S1 checks, and a fresh gate. The fresh gate passed after one independent pass with technical verdict ready and no supported material findings. S1 is verified within its slice boundary. The user subsequently authorized S2–S5 sequentially; each requires reassessment before implementation and verification before the next slice.

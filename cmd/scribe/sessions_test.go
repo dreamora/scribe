@@ -535,9 +535,11 @@ func TestRecordSessionProcessed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recordSessionProcessed(root, "sess-alpha")
-	recordSessionProcessed(root, "sess-beta")
-	recordSessionProcessed(root, "sess-alpha") // idempotent re-record must not duplicate
+	for _, sid := range []string{"sess-alpha", "sess-beta", "sess-alpha"} {
+		if err := applyMetaSessionsLogAppend(root, MetaAction{Op: "sessions_log_append", SessionID: sid}, ApplyOptions{}); err != nil {
+			t.Fatalf("record %s: %v", sid, err)
+		}
+	}
 
 	raw, err := os.ReadFile(filepath.Join(root, "wiki", "_sessions_log.json"))
 	if err != nil {

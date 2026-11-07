@@ -208,13 +208,13 @@ func TestIssue2ToolsRollingIncompleteInventoryStops(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside := t.TempDir()
-	err := runToolsRollingSession(root, func() error {
+	err := runRollingSession(root, func() error {
 		writeKBFile(t, root, "projects/acme/learnings.md", "changed")
 		if err := os.Remove(blocked); err != nil {
 			return err
 		}
 		return os.Symlink(outside, blocked)
-	})
+	}, nil)
 	if !errors.Is(err, errRollingRestore) {
 		t.Fatalf("incomplete inventory must stop commits, got %v", err)
 	}

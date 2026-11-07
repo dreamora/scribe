@@ -29,3 +29,15 @@ S3 commit: `803fce1`. S4 parent: `803fce1`. Candidate scratch: `/private/tmp/scr
 - `make check`: exit 0; full package tests 38.681 seconds, then successful vet.
 
 The focused selection covers all issue #2 fixtures and collision safety. Race also selects ordinary lint, lock identity/acquisition, rate-limit, marker and initialization regressions. The environment and raw artifact layout follow S3 above.
+
+## S5: atomic repair and final completion recovery
+
+S4 commit: `d01702f`. S5 parent: `d01702f`. Candidate scratch: `/private/tmp/scribe-slice-commits-20261108/s5/tree`. The S5 delta uses the preserved pre-S5 baseline and the final reviewed/prose-synchronized target. It includes the final audit correction that requires tools processed-marker persistence before counts or checkpoints; both normal and large marker-failure cases restore rolling state and leave the damaged control log intact.
+
+- Focused: 159 passing named outcomes, zero failures/skips; package 13.668 seconds.
+- Targeted race: 201 passing named outcomes, zero failures/skips; package 33.955 seconds.
+- `make check`: exit 0; full package tests 37.877 seconds, then successful vet.
+
+Focus covers all issue #2 fixtures and collision safety; race additionally selects ordinary lint, lock, rate-limit, checked marker ownership/idempotence and initialization regressions. Each candidate's main module origin was independently resolved to its own scratch tree. Environment and raw artifact layout follow S3 above. Each of S3, S4 and S5 was tested independently on its committed predecessor, not only at the final tip.
+
+The final source remains local. Separate slice commits do not include unrelated provider, cap, deep, triage, generic recovery or concurrent glossary changes. No installation or remote publication was performed.

@@ -12,11 +12,9 @@ import (
 )
 
 func (l *LintCmd) runRollingOnly() error {
+	l.rollingApply = false
 	if !l.Fix {
 		return errors.New("--rolling-only requires --fix")
-	}
-	if !l.DryRun {
-		return errors.New("rolling-only apply is not available yet; use --fix --rolling-only --dry-run")
 	}
 	if l.Contradictions || l.Duplicates || l.Resolve || l.Identities || l.ApplyIdentities {
 		return errors.New("--rolling-only cannot be combined with another lint operation")
@@ -34,7 +32,11 @@ func (l *LintCmd) runRollingOnly() error {
 		return err
 	}
 	lockPath := lockPathFor(cfg.LockDir, "sync", root)
-	lf, ok, err := acquireOperationLock(lockPath, "rolling-only preview")
+	operation := "rolling-only repair"
+	if l.DryRun {
+		operation = "rolling-only preview"
+	}
+	lf, ok, err := acquireOperationLock(lockPath, operation)
 	if err != nil {
 		return err
 	}
@@ -42,25 +44,30 @@ func (l *LintCmd) runRollingOnly() error {
 		return fmt.Errorf("%w: %s holds the selected KB sync lock", errLockBusy, lockOwnerDetails(lockPath))
 	}
 	defer releaseLock(lf)
-	return l.previewRollingFiles(root)
+	l.rollingApply = !l.DryRun
+	return l.repairRollingFiles(root)
 }
 
-func (l *LintCmd) previewRollingFiles(root string) error {
+func (l *LintCmd) repairRollingFiles(root string) error {
 	var files []string
 	var err error
 	if l.Changed || len(l.Files) > 0 {
 		files, err = l.targetFiles(root)
 	} else {
-		files = rollingPreviewFiles(root)
+		files = rollingRepairFiles(root)
 	}
 	if err != nil {
 		return err
 	}
 	sort.Strings(files)
 	scanned, repairs, unchanged, unresolved := 0, 0, 0, 0
+	verb := "repaired"
+	if l.DryRun {
+		verb = "would repair"
+	}
 	seen := make(map[string]bool)
 	for _, file := range files {
-		path, rel, err := rollingPreviewPath(root, file)
+		path, rel, err := rollingRepairPath(root, file)
 		if seen[path] {
 			continue
 		}
@@ -77,6 +84,19 @@ func (l *LintCmd) previewRollingFiles(root string) error {
 		if err == nil {
 			proposal, err = repairSessionRolling(root, rel, data)
 		}
+		if err == nil && !l.DryRun && !bytes.Equal(data, proposal) {
+			path, _, err = rollingRepairPath(root, path)
+			if err == nil {
+				var info os.FileInfo
+				info, err = os.Lstat(path)
+				if err == nil && !info.Mode().IsRegular() {
+					err = errors.New("repair target is no longer a regular file")
+				}
+				if err == nil {
+					err = replaceFileAtomic(path, proposal, info.Mode().Perm())
+				}
+			}
+		}
 		switch {
 		case err != nil:
 			unresolved++
@@ -86,17 +106,21 @@ func (l *LintCmd) previewRollingFiles(root string) error {
 			fmt.Printf("unchanged %s\n", filepath.ToSlash(rel))
 		default:
 			repairs++
-			fmt.Printf("would repair %s\n", filepath.ToSlash(rel))
+			fmt.Printf("%s %s\n", verb, filepath.ToSlash(rel))
 		}
 	}
-	fmt.Printf("scanned %d, would repair %d, unchanged %d, unresolved %d\n", scanned, repairs, unchanged, unresolved)
+	fmt.Printf("scanned %d, %s %d, unchanged %d, unresolved %d\n", scanned, verb, repairs, unchanged, unresolved)
+	mergeRunStats(map[string]any{
+		"rolling_only": true, "dry_run": l.DryRun, "files_scanned": scanned,
+		"files_repaired": repairs, "files_unchanged": unchanged, "files_unresolved": unresolved,
+	})
 	if unresolved != 0 {
-		return fmt.Errorf("rolling preview: %d unresolved file(s)", unresolved)
+		return fmt.Errorf("rolling repair: %d unresolved file(s)", unresolved)
 	}
 	return nil
 }
 
-func rollingPreviewPath(root, file string) (string, string, error) {
+func rollingRepairPath(root, file string) (string, string, error) {
 	path, err := filepath.Abs(file)
 	if err != nil {
 		return file, file, err
@@ -117,7 +141,7 @@ func rollingPreviewPath(root, file string) (string, string, error) {
 	return guarded, rel, nil
 }
 
-func rollingPreviewFiles(root string) []string {
+func rollingRepairFiles(root string) []string {
 	var files []string
 	for _, dir := range wikiDirs {
 		base := filepath.Join(root, dir)

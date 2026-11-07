@@ -1,10 +1,10 @@
 # Issue #2: tools-mode rolling files
 
 Date: 2026-11-06
-Verdict: S1–S4 VERIFIED within their slice boundaries; S4 fresh independent gate PASSED after one pass. The initial S1 gate remains historically BLOCKED.
-Confidence: high
+Verdict: S1–S5 VERIFIED locally; current R1–R9 acceptance audit complete with no open material gaps. The expanded S5 gate PASSED after two passes. The initial S1 gate remains historically BLOCKED.
+Confidence: medium
 
-Evidence applies to the named local checks and reviewer probes. The initial gate's directory-alias counterexample is retained below. The authorized correction passes matching regressions and the fresh independent gate. No deployed behavior or whole-PRD completion is claimed.
+Evidence applies to the named local checks and reviewer probes. Historical counterexamples and their corrections are retained below. The confirmed PRD is implemented and locally verified; deployed behavior is not established.
 
 ## Tried
 
@@ -324,11 +324,11 @@ Fresh independent gate: **PASSED** after one independent pass, technical verdict
 
 The reviewer reconstructed `335cb44` plus all 388 pre-S3 baseline files and verified module/package origins. The representative check there produced one expected behavioral failure: invented dates and empty sources. Artifacts: `/private/tmp/scribe-issue2-s3-review/pass-1/{independent-focused.jsonl,independent-baseline-representative.jsonl,baseline-probe-origins.json,baseline-probe-package.json,target-hashes.json}`. The parent independently reconfirmed all 13 unchanged hashes, the 54 independent passes, and final full test/vet results. S1/S2 historical gates and commits remain separate. Retain verified S3 and reassess S4.
 
-The rolling-only recovery boundary excludes unrelated article output. Primary generation can already be in flight when a fatal error occurs; queued envelopes are discarded and workers drained before return. These local caught-failure checks do not prove crash recovery, external-mutator safety, deployed behavior, or whole-PRD completion. No S3 commit, installation, push, live KB or authenticated-model action ran.
+The rolling-only recovery boundary excludes unrelated article output. Primary generation can already be in flight when a fatal error occurs; queued envelopes are discarded and workers drained before return. These local caught-failure checks do not prove crash recovery, external-mutator safety, deployed behavior, or whole-PRD completion. No S3 commit, installation, push, live KB or authenticated-model action ran during that gate handoff. The later local slice commits are recorded in [commit verification](issue-2-slice-commits.md).
 
 ## S4: rolling-only CLI preview
 
-Date: 2026-11-06. Status: VERIFIED; focused/race/full local checks passed; fresh independent gate PASSED after one pass. S5 apply remains unstarted at this handoff. S1/S2 commits and the prior gates remain separate; no S4 commit was created.
+Date: 2026-11-06. Status: VERIFIED; focused/race/full local checks passed; fresh independent gate PASSED after one pass. S5 apply remains unstarted at this handoff. S1/S2 commits and the prior gates remain separate; no S4 commit was created during that handoff. Later local commits are recorded in [commit verification](issue-2-slice-commits.md).
 
 ### Tried and findings
 
@@ -405,3 +405,170 @@ Fresh independent gate: **PASSED** after one independent pass, technical verdict
 Independent command: `go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2RollingPreview' -count=1 -json`. Result: **26 passes, zero failures/skips, exit 0**, package 0.714 seconds. Raw artifact: `/private/tmp/scribe-issue2-s4-review/pass-1/independent-focused.jsonl`. The reviewer reused matching 138 focused/181 race passes and terminal full test/vet results; it did not claim independent baseline execution. The parent independently reconfirmed eight unchanged hashes and 26 independent passes. Retain verified S4 and reassess S5.
 
 This proves named local preview and coordination behavior. Apply/atomic replacement and repeated repair remain unimplemented for S5. Lock-file metadata is coordination state; fixture locks are outside KB content. Unknown owner details and unsupported aliases remain explicit. No live KB repair, installed binary, commit, push, or authenticated model action ran.
+
+## S5: per-file rolling repair apply
+
+Date: 2026-11-06. Status: VERIFIED; expanded focused/race/full local checks passed, independent gate PASSED after two passes, and current R1–R9 audit complete. Prior slice gates and the S1/S2 commits remain separate. Local slice commits followed on 2026-11-08; see [commit verification](issue-2-slice-commits.md).
+
+### Tried and findings
+
+The [S5 contract](../issue-2-rolling-frontmatter-plan.md#s5-apply-rolling-only-repairs-independently-per-file) completes the actual apply interface through the same scope, metadata assessment and sync lock as preview.
+
+- [`lint_rolling.go:14`](../../cmd/scribe/lint_rolling.go#L14) requires `--fix`, rejects conflicting lint operations and acquires the same sync lock for preview/apply. [`lint.go:131`](../../cmd/scribe/lint.go#L131) marks only a real apply that entered the acquired-lock phase as mutating, so busy/invalid requests do not append run records.
+- [`lint_rolling.go:51`](../../cmd/scribe/lint_rolling.go#L51) shares selection and proposal assessment. The proposal policy validates before replacement; paths/regular-file state are rechecked before writes. Only successful replacements count as repaired. Errors remain per-file and do not stop valid siblings.
+- [`wiki_actions.go:1198`](../../cmd/scribe/wiki_actions.go#L1198) uses the existing same-directory atomic writer with an explicit permission-mode variant. The temporary file receives the original permission bits before replacement; default atomic-writer callers retain their prior umask behavior. Write/close/rename failures clean the temporary file and leave the target unreplaced.
+
+The first real CLI apply reproduced S4's explicit refusal. After implementation it exits 0, reports `scanned 1, repaired 1, unchanged 0, unresolved 0`, and persists supported dates/sources/defaults while preserving body, contributor/custom/high-confidence values and mode 0600. Inode replacement and the complete resulting article were inspected before expanding variants. Unrelated duplicates, placeholders and processed-log bytes stayed unchanged; real apply retained its normal run record.
+
+Expanded checks exposed two additional problems. Passing mode 0660 to the generic writer under umask 077 produced 0600; the exact-mode adapter now preserves 0660 without changing generic caller semantics. Busy apply initially wrote an error run record; the acquired-apply state now prevents any KB file creation on busy requests. Both have discriminating red/green results.
+
+### Check and observed output
+
+All final commands use `GOCACHE=/private/tmp/scribe-issue2-go-cache`:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview|RollingApply)' -count=1 -json
+go test -race -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview|RollingApply)|^TestLint|^TestChangedWikiFiles|^TestKBLockScope|^TestLockPathFor|^TestAcquireLock|^TestMineSessionBatches_StopsAfterRateLimit$|^TestRecordSessionProcessed$|^TestApplyMetaRollingAppend_InitFrontmatterLintValid$' -count=1 -json
+make check
+```
+
+Focused: **passed**, 46 top-level tests plus 107 subtests = 153 pass events, zero failures/skips; package 14.151 seconds. Race: **passed**, 71 top-level tests plus 125 subtests = 196 pass events, zero failures/skips; package 32.330 seconds. Full `make check`: **passed**, exit 0:
+
+```text
+go test -tags "sqlite_fts5"  -count=1 -timeout 20m ./...
+ok  github.com/oliver-kriska/scribe/cmd/scribe  38.016s
+go vet -tags "sqlite_fts5" ./...
+```
+
+The full check used approved local-loopback access for existing hermetic `httptest` fixtures. Real CLI main/Kong, filesystem writes, validation, atomic replacement and OS locks remain real. No installed binary, live KB, network/model service or production fault seam is used.
+
+| Case | Local observation |
+| --- | --- |
+| E1 | Complete persisted representative inspected after real CLI success: metadata/date/source defaults, byte-identical body/valid fields, original mode, inode replacement and normal apply telemetry. |
+| E2 | Full apply repairs standard/configured targets, archives, untouched projects, Unicode marked content and underscore-marked files. Explicit/duplicate/changed/changed-precedence/root-alias selectors pass; ordinary/non-Markdown/raw files remain excluded. |
+| E3 | Mixed apply reports `scanned 6, repaired 4, unchanged 1, unresolved 1`, returns nonzero, repairs valid siblings and preserves unresolved/valid/unrelated bytes. Repeat reports zero repairs and identical article content; subsequent preview proposes zero. Operational apply run records are excluded from article-stability comparisons. |
+| E4 | Child-only `RLIMIT_FSIZE=4096`, with SIGXFSZ ignored, makes the real temporary write fail with `file too large`. Output reports `scanned 2, repaired 1, unchanged 0, unresolved 1`: failed large original remains byte-identical, small sibling validates, and no temporary file leaks. This is a caught write failure, separate from validation rejection; it does not prove crash recovery. |
+| E5 | Both busy apply and preview exit nonzero, identify sync/PID and preserve the complete KB tree and holder details. Successful apply still writes normal telemetry. Help/preview/ordinary lint remain checked; only the obsolete intermediate apply-block row was removed and replaced by final-interface coverage. |
+
+The caught write-fault output was:
+
+```text
+unresolved projects/acme/decisions-log.md: write tmp: write <fixture>/.scribe-<random>.tmp: file too large
+repaired projects/acme/learnings.md
+scanned 2, repaired 1, unchanged 0, unresolved 1
+scribe: error: rolling repair: 1 unresolved file(s)
+```
+
+Here `<fixture>` and `<random>` replace only the temporary location/name from the preserved raw log. The resource limit and umask affect only the child test process. No privileged permission assumption, mocked writer or live process limit is involved.
+
+Raw artifacts under `/private/tmp/scribe-issue2-s5-before-20261106`: `representative-{red,green}.log`, `expanded-{first,green}.log`, `cli-green.log`, `busy-{red,green}.log`, `focused.jsonl`, `race.jsonl`, and `make-check.log`.
+
+### Historical S5 pass-1 target identity
+
+Baseline: `eb48423` plus verified S3/S4 and preserved unrelated working changes. All 427 source/module/document origins and hashes are retained under `baseline/` and `baseline-hashes.json`. The initial eight-file delta below is retained as `pass1-target.patch` and `pass1-target-hashes.json`; current expanded identity follows under AUDIT-1. Whole Git diff is not the review target. Unrelated baseline source hashes remain unchanged.
+
+| S5 initial pass-1 file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/lint.go` | `85becb0f664eaa3507315ccb7b94a9e50dea6583d595c6b9c2b5d110e8c4e06e` |
+| `cmd/scribe/lint_rolling.go` | `f1b831805c012c4320a3eec5f3614ace04f74ef92e5901ef40a7916180c8606c` |
+| `cmd/scribe/wiki_actions.go` | `d2e961b97befbf0e5e8302701889d52108a59e69e61aa9a20588b90996a625c3` |
+| `cmd/scribe/issue2_rolling_preview_test.go` | `098c9db6d85b254487748c519bf17934a05943a4d042cbc4fcc9107b1f20d49c` |
+| `cmd/scribe/issue2_rolling_apply_test.go` | `66b54fcd45c1c5794353a9f82c933daa7c0bc99817fc66188fed82720871fe20` |
+| `README.md` | `1b5b1c313d65bf3824f0f9387b6ff279d99fe8d96118fe4b8c98ca3dcf9236da` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `3e7b2b6c1cd174d54f0dcbd406aeb850f761500cec421d56761c815b8389106f` |
+| `cmd/scribe/skills/scribe-cli/SKILL.md` | `a055319e798540199c83d6865115f4e5e61f8c96006573dcc98efd65555f2eda` |
+
+### S5 gate and next decision
+
+Initial S5 independent gate: **PASSED** after one pass; technical verdict **ready**, no supported findings/testing gaps. Eight target hashes, seven old origins/new test absence, all 427 baseline files and exact parent `eb48423` were verified with module/package origins. Independent `^TestIssue2Rolling(Apply|Preview)` executed 41 passing outcomes (15 top-level tests), zero failures/skips, exit 0, package 1.180 seconds. The baseline representative produced one expected behavioral assertion failure (apply unavailable), not a setup/compile error. Artifacts: `/private/tmp/scribe-issue2-s5-review/pass-1/{independent-focused.jsonl,baseline-representative.jsonl,baseline-probe-origins.json,baseline-package-origin.txt,post-review-hash-check.json}`. Parent checks reconfirmed the eight hashes and outcomes.
+
+The subsequent whole-current R1–R9 audit found a required lifecycle gap, **AUDIT-1 (P2)**, in the tools completion path. At that point `mineSessionsSerial` incremented count/batch and called void `recordSessionProcessed`; that helper logged persistence errors without returning them. A session could leave rolling output available for a checkpoint without its persisted marker. This conflicted with A5's matching-marker and caught-session completion/recovery intent across R1/R7/R8. It was a missing checked completion boundary, not a new product decision. The correction and refreshed gate below close it.
+
+The initial eight-file pass remains historical. S5 completion was reopened for the bounded correction and refreshed whole-target review. Source/hash origins were captured before correction under `/private/tmp/scribe-issue2-audit1-before-20261106/{baseline/,baseline-hashes.json}`. The original S5 manifest/patch are retained as `pass1-target-hashes.json`/`pass1-target.patch` in the pre-S5 scratch root. The correction reused the existing validated transaction callback and checked marker primitive, preserving rolling-only rollback and unrelated callers.
+
+The named local checks do not establish deployed behavior, crash recovery, unsupported alias traversal or rollback of unrelated articles. No source staging/commit, installation, push, live repair or authenticated model call occurred.
+
+### AUDIT-1 correction target and checks
+
+AUDIT-1 disposition: **corrected and independently verified**. Both normal and large real-child regressions first demonstrated `mined=2`, retained existing/new rolling output and an actual Git checkpoint whose committed marker log still contained its original damaged bytes. The parent observed the child mutations before releasing its successful return. This was a product failure, not setup or compilation failure.
+
+The tools caller now passes a checked `applyMetaSessionsLogAppend` completion callback to [`runRollingSession`](../../cmd/scribe/session_rolling.go#L191). Validation precedes that callback; completion count, batch tracking and checkpoints follow only its success. On callback error, the same rolling restoration/fatal-error path used for model/metadata failures runs. The obsolete tools wrapper and void marker wrapper were removed; their existing tests now use the real shared transaction/checked primitive, retaining original assertions and ownership/idempotence checks. Unrelated production marker callers were not changed.
+
+The matching green regressions demonstrate zero completion, exact old rolling bytes, removal of the new rolling file, preserved damaged-log/control bytes, pending sessions, unchanged HEAD and no staging. Marker-specific failed restoration uses the existing shared error/restore branch; actual full-sync fatal propagation remains covered by the normal/large tools and normal/large/Codex envelope fault tests rather than a new fault mechanism.
+
+Latest commands, with `GOCACHE=/private/tmp/scribe-issue2-go-cache`:
+
+```sh
+go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview|RollingApply)' -count=1 -json
+go test -race -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2(Tools|Envelope|RollingPreview|RollingApply)|^TestLint|^TestChangedWikiFiles|^TestKBLockScope|^TestLockPathFor|^TestAcquireLock|^TestMineSessionBatches_StopsAfterRateLimit$|^TestRecordSessionProcessed$|^TestApplyMetaSessionsLogAppend$|^TestApplyMetaRollingAppend_InitFrontmatterLintValid$' -count=1 -json
+make check
+```
+
+Expanded focused: **passed**, 47 top-level tests plus 109 subtests = 156 pass events, zero failures/skips; package 14.479 seconds. Expanded race: **passed**, 73 top-level tests plus 127 subtests = 200 pass events, zero failures/skips; package 32.689 seconds. Full `make check`: **passed**, terminal exit 0, tests 38.247 seconds followed by vet. Approved local-loopback access was retained for existing hermetic test servers; no live services/model calls were enabled.
+
+Correction artifacts: `/private/tmp/scribe-issue2-audit1-before-20261106/{baseline/,baseline-hashes.json,marker-red.log,marker-green.log,focused.jsonl,race.jsonl,make-check.log}`. This pre-correction snapshot preserves 428 file origins. The complete expanded S5 target still compares against the **original pre-S5 427-file baseline**, retaining all original eight target files. It now has 14 files: 12 old origins and two new test files. Current `final-target-hashes.json`/`target.patch` are in `/private/tmp/scribe-issue2-s5-before-20261106`.
+
+| Expanded S5 independently reviewed file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/lint.go` | `85becb0f664eaa3507315ccb7b94a9e50dea6583d595c6b9c2b5d110e8c4e06e` |
+| `cmd/scribe/lint_rolling.go` | `f1b831805c012c4320a3eec5f3614ace04f74ef92e5901ef40a7916180c8606c` |
+| `cmd/scribe/wiki_actions.go` | `d2e961b97befbf0e5e8302701889d52108a59e69e61aa9a20588b90996a625c3` |
+| `cmd/scribe/issue2_rolling_preview_test.go` | `098c9db6d85b254487748c519bf17934a05943a4d042cbc4fcc9107b1f20d49c` |
+| `cmd/scribe/issue2_rolling_apply_test.go` | `66b54fcd45c1c5794353a9f82c933daa7c0bc99817fc66188fed82720871fe20` |
+| `README.md` | `3b40ef003248d02ec697da75acfb4297072fd13a5da639fe3f01f050c065ea05` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `3e7b2b6c1cd174d54f0dcbd406aeb850f761500cec421d56761c815b8389106f` |
+| `cmd/scribe/skills/scribe-cli/SKILL.md` | `a055319e798540199c83d6865115f4e5e61f8c96006573dcc98efd65555f2eda` |
+| `cmd/scribe/sync_sessions.go` | `790f74b103097baee093ab9489b03c38c0f2891b0f34a9c9d1921d5a78cae3bb` |
+| `cmd/scribe/session_rolling.go` | `a0dca4f97cfe84b80efcf9822d383e3e5a195f8504e3d7b161f729e9dcc1dc16` |
+| `cmd/scribe/issue2_tools_rolling_test.go` | `3bbe1f74b321e0e6968dafd95022cc384812408e0f3bd3414bc8d9883d9e8d7b` |
+| `cmd/scribe/issue2_tools_marker_test.go` | `91460f1ae980eaf9779dff8d633526f79a695b5dd0042de21931c2ef7e08feee` |
+| `cmd/scribe/sessions_test.go` | `f2a9597b85e672428f099e7473328711f49d4fd9f0874a3b8a7e233cc0562bb6` |
+| `cmd/scribe/wiki_actions_meta_test.go` | `b98b1af4a3fce2df437390cc384ee06030557e52219839cb46ac1ec1fe619638` |
+
+Refreshed S5 review (pass 2): **PASSED**, latest technical verdict **ready**, no supported findings/testing gaps in the full 14-file scope. The historical eight-file pass-1 result is not relabeled. No source or scope was discarded from the expanded review target.
+
+### Expanded S5 review and final prose identity
+
+The expanded gate **PASSED after two fresh passes**, latest technical verdict **ready**, no supported findings/testing gaps. Pass 2 independently verified all 14 target hashes before/after, original 427-file overlays and module/package origins. Its command `go test -tags sqlite_fts5 ./cmd/scribe -run '^TestIssue2Rolling(Apply|Preview)|^TestIssue2ToolsMarker|^TestRecordSessionProcessed|^TestApplyMetaSessionsLog' -count=1 -json` passed **46 named outcomes**, zero failures/skips, exit 0, package 1.668 seconds. Exact baseline probes produced three expected marker-failure events (normal, large and parent test) and one expected apply-unavailable failure. These were behavioral assertion failures, not setup/compile errors; the current target passed. Parent independently checked those results and unchanged hashes.
+
+Review artifacts: `/private/tmp/scribe-issue2-s5-review/pass-2/{independent-focused.jsonl,independent-baseline-marker.jsonl,independent-baseline-apply.jsonl,independent-baseline-proof.json,independent-baseline-origins.json}` and `/private/tmp/scribe-issue2-s5-review/gate-result.json`. The independently reviewed 14-file identity/patch are retained as `pass2-target-hashes.json`/`pass2-target.patch` under `/private/tmp/scribe-issue2-s5-before-20261106`.
+
+After review, only stale ordinary comments in `claude.go`/`wiki_actions.go` and one test failure-message string in `wiki_actions_meta_test.go` were synchronized to the checked completion writer. Exact inverse replacement/readback proved these were the only changes: no executable, prompt or contract changes. This is separate prose readback, not a claim that the reviewer examined changed hashes. Artifacts `/private/tmp/scribe-issue2-s5-postreview-prose/{before/,before-hashes.json,prose-only.patch,readback.json,final-target-hashes.json,final-target.patch}` preserve the difference and final identity. The final delta retains all 14 reviewed files and adds `claude.go` with one comment-only hunk against the original pre-S5 origin. No material pass 3 or software rerun was needed.
+
+### Current R1–R9 completion audit
+
+Date: 2026-11-06. Result: **all nine requirements and their acceptance boundaries locally VERIFIED; no open material gaps**. This audit inspected current owning source and actual named assertions/outcomes rather than inferring delivery from a helper or slice status. Every `TestIssue2...` named below appears as passing in the latest 156-outcome focused log and 200-outcome race log. Existing ordinary-lint, changed-file, lock, budget/rate and checked-marker regressions also pass in the race/full checks. Historical tests/counts above remain tied to their original targets.
+
+| Requirement | Inspected current boundary and named tests | Observed acceptance result |
+| --- | --- | --- |
+| R1 | [`runRollingSession`](../../cmd/scribe/session_rolling.go#L191), tools checked callback before counts in [`sync_sessions.go`](../../cmd/scribe/sync_sessions.go#L502), envelope apply/collector and separate Codex checked callback. `TestIssue2ToolsRollingSuccess`, `TestIssue2ToolsVariantsNormal`, `TestIssue2ToolsVariantsLarge`, `TestIssue2EnvelopeRepresentative`, `TestIssue2EnvelopeVariants`, `TestIssue2EnvelopeCodexCaller`, `TestIssue2ToolsMarkerFailureRestoresBeforeCheckpoint`. | Real tools child output is observed invalid with no marker, then repaired/validated before persistence of success. Both normal/large prompts and normal/large/Codex envelope callers create/update valid rolling output. Untouched invalid regular files remain unchanged and do not block unrelated sessions. Failed marker persistence cannot count or checkpoint a session. |
+| R2 | `isSessionRollingFile`, [`rollingRepairFiles`](../../cmd/scribe/lint_rolling.go#L144), shared selected-file loop and path guard. `TestIssue2ToolsVariantsNormal`, `TestIssue2ToolsVariantsLarge`, `TestIssue2ToolsVariantsRejectAndRestore`, `TestIssue2RollingPreviewFullScope`, `TestIssue2RollingPreviewSelectors`, `TestIssue2RollingApplySelectors`, `TestIssue2RollingApplyMixedAndStable`. | Standard learnings/decisions, configured targets, each yearly archive variant, headerless/missing-marker files under projects, untouched projects, marked nonstandard/Unicode/underscore content are selected. Malformed explicitly marked YAML and named `rolling: false` conflicts are unresolved. Ordinary articles, raw content and non-Markdown files are excluded. Explicit duplicate selectors deduplicate; --changed retains precedence. Nested aliases reject safely; selected KB-root aliases remain supported. |
+| R3 | [`repairSessionRolling`](../../cmd/scribe/session_rolling.go#L309), full-filename Unicode title policy and proposal validation before write. `TestIssue2ToolsVariantsNormal`, `TestIssue2ToolsVariantsLarge`, `TestIssue2ToolsRollingPreservesValues`, `TestIssue2ToolsVariantsPreservesMetadata`, `TestIssue2EnvelopeVariants`, `TestIssue2RollingApplyRepresentative`, `TestIssue2RollingApplyUnresolvedMetadata`. | Assertions check directory plus full filename titles including custom/archive/Unicode names, type project, allowed directory domain or general, medium/contextual, rolling true, empty tags/related and required provenance. Valid contributor/custom fields and metadata values survive; body bytes are identical. Invalid existing confidence/types/calendar values are rejected with original bytes preserved. |
+| R4 | `rollingEntryProvenance` and shared missing-only additions followed by full schema/date validation. `TestIssue2ToolsRollingProvenanceRejectsExamples`, `TestIssue2ToolsVariantsNoReferences`, `TestIssue2ToolsVariantsRejectAndRestore`, `TestIssue2EnvelopeRepresentative`, `TestIssue2EnvelopeRejectsMetadata`, `TestIssue2RollingPreviewUnresolvedMetadata`, `TestIssue2RollingApplyRepresentative`, `TestIssue2RollingApplyUnresolvedMetadata`. | Newest-first entries yield created 2026-10-01 and updated 2026-11-01. Fenced examples, longer fence delimiters and indented closing-looking lines do not contaminate dates or sources. Explicit session references recover sources; none gives an empty list. Valid existing dates/sources remain intact. Undated or contradictory evidence leaves files unchanged/unresolved; no repair-day substitution occurs. |
+| R5 | Early rolling-only dispatch in [`lint.go`](../../cmd/scribe/lint.go#L38), common preview/apply CLI path, existing selectors and legacy repair branch. `TestIssue2RollingPreviewRepresentative`, `TestIssue2RollingPreviewSelectors`, `TestIssue2RollingPreviewHelpAndOrdinaryLint`, `TestIssue2RollingPreviewFlagsAndBusy`, `TestIssue2RollingApplyRepresentative`, `TestIssue2RollingApplySelectors`. | Actual CLI main/Kong subprocesses accept both final commands; --rolling-only without --fix fails visibly. Preview reports proposals without content writes. Apply persists only selected rolling repairs. Neither enters duplicate cleanup: duplicate/placeholder/unrelated and processed-log bytes survive. Ordinary lint/repair still passes its existing regressions. Help, README, two tools prompts, four envelope prompts, KB template and embedded CLI guidance match delivered scope/default/provenance/recovery behavior. |
+| R6 | Shared assessment/count loop in [`lint_rolling.go`](../../cmd/scribe/lint_rolling.go#L51), validated proposal before rechecked regular-path atomic replacement and exact-mode writer. `TestIssue2RollingApplyRepresentative`, `TestIssue2RollingApplyMixedAndStable`, `TestIssue2RollingApplyWriteFailure`, `TestIssue2RollingApplyPreservesMode`, `TestIssue2RollingApplyUnresolvedMetadata`, `TestIssue2RollingPreviewFullScope`. | Mixed batch scans 6, repairs 4, leaves 1 unchanged/1 unresolved, reports paths/causes and exits nonzero. Repeated apply repairs 0 with unchanged article bytes; following preview proposes 0. Child-only RLIMIT_FSIZE makes a real temporary write fail: the large original survives, a valid small sibling repairs, no temp leaks, 2/1/0/1 counts and nonzero. Body/valid/custom metadata and Unix modes 0600/0660 survive; replacement changes inode. Preview uses the same assessment and writes no KB content, including operational records. |
+| R7 | Serial tools routing, parallel generation workers with collector-only Go apply/validate/restore/marker/checkpoint, and sequential Codex apply. `TestIssue2ToolsRollingSerializesWorkers`, `TestIssue2ToolsRollingCheckpoint`, `TestIssue2ToolsVariantsLargeCheckpoint`, `TestIssue2EnvelopeParallelIsolationCheckpoint`, `TestIssue2ToolsMarkerFailureRestoresBeforeCheckpoint`. | Configured parallel tools calls never overlap. Two primary envelope generations demonstrably overlap; while failed-session output exists, a completed sibling cannot apply or checkpoint. After rollback, a real Git checkpoint contains only valid successful sibling content and matching marker; failed output/marker is absent. Tools marker-error regressions prove no unmatched-marker checkpoint in either prompt family. |
+| R8 | Shared snapshot/restore and fatal sentinel through batch/extraction/SyncCmd.Run, distinct Codex callback. `TestIssue2ToolsRollingRestoresAfterFailure`, `TestIssue2ToolsVariantsRejectAndRestore`, `TestIssue2ToolsMarkerFailureRestoresBeforeCheckpoint`, `TestIssue2EnvelopeMarkerFailureRestores`, `TestIssue2ToolsRollingRestoreFailureStopsSync`, `TestIssue2ToolsVariantsLargeRestoreFailureStopsSync`, `TestIssue2EnvelopeFatalStopsSync`. | Parent observes actual existing/new rolling mutation before releasing caught child/model/metadata/marker failures. Old bytes restore, new output is removed, sessions remain pending and damaged control logs stay intact. Normal/large tools and normal/large/Codex full sync faults prove failed restoration stops later mining, staging, checkpoints and final commits. Inventory/alias tests prevent unsafe recovery from touching alias destinations. Rollback remains rolling-only; no crash recovery is claimed. |
+| R9 | [`runRollingOnly`](../../cmd/scribe/lint_rolling.go#L14), existing canonical sync lock identity and nonblocking flock owner reporting in [`lockfile.go`](../../cmd/scribe/lockfile.go#L24). `TestIssue2RollingPreviewLockOwnership`, `TestIssue2RollingPreviewFlagsAndBusy`, `TestIssue2RollingPreviewContainment`, `TestIssue2RollingApplyBusy`, representative successful CLI tests and existing lock regressions. | Both apply and preview refuse a held selected-KB sync lock with nonzero status and active sync/PID, preserving the complete KB tree and holder details. Unlabeled holders get truthful unavailable-owner fallback rather than stale details. Locks remain on the same inode, different KBs remain independent and root aliases contend. Available-lock paths proceed normally. Ordinary lint coordination remains unchanged. |
+
+Completion limits: fixture-local subprocesses and provider responses, temporary KB/filesystem/Git and OS locks establish the named implementation behavior. No live provider reasoning, installed runtime, scheduler, deployment or production KB repair was tested or changed. Process-crash recovery, rollback of unrelated article output and supported nested-alias traversal remain excluded. File-mode tests do not claim ACL/xattr preservation. S3–S5 were later committed separately on 2026-11-08 after isolated candidate verification. No installation, push or publication was performed. S1/S2 local commits and all earlier gate outcomes remain separate historical records.
+
+### Final post-review source identity
+
+| Final file | SHA-256 |
+| --- | --- |
+| `cmd/scribe/lint.go` | `85becb0f664eaa3507315ccb7b94a9e50dea6583d595c6b9c2b5d110e8c4e06e` |
+| `cmd/scribe/lint_rolling.go` | `f1b831805c012c4320a3eec5f3614ace04f74ef92e5901ef40a7916180c8606c` |
+| `cmd/scribe/wiki_actions.go` | `4eefabf56f956c73064498792fbfba5966b96502bdd53a7f1023f3cff484403d` |
+| `cmd/scribe/issue2_rolling_preview_test.go` | `098c9db6d85b254487748c519bf17934a05943a4d042cbc4fcc9107b1f20d49c` |
+| `cmd/scribe/issue2_rolling_apply_test.go` | `66b54fcd45c1c5794353a9f82c933daa7c0bc99817fc66188fed82720871fe20` |
+| `README.md` | `3b40ef003248d02ec697da75acfb4297072fd13a5da639fe3f01f050c065ea05` |
+| `cmd/scribe/templates/kb-CLAUDE.md` | `3e7b2b6c1cd174d54f0dcbd406aeb850f761500cec421d56761c815b8389106f` |
+| `cmd/scribe/skills/scribe-cli/SKILL.md` | `a055319e798540199c83d6865115f4e5e61f8c96006573dcc98efd65555f2eda` |
+| `cmd/scribe/sync_sessions.go` | `790f74b103097baee093ab9489b03c38c0f2891b0f34a9c9d1921d5a78cae3bb` |
+| `cmd/scribe/session_rolling.go` | `a0dca4f97cfe84b80efcf9822d383e3e5a195f8504e3d7b161f729e9dcc1dc16` |
+| `cmd/scribe/issue2_tools_rolling_test.go` | `3bbe1f74b321e0e6968dafd95022cc384812408e0f3bd3414bc8d9883d9e8d7b` |
+| `cmd/scribe/issue2_tools_marker_test.go` | `91460f1ae980eaf9779dff8d633526f79a695b5dd0042de21931c2ef7e08feee` |
+| `cmd/scribe/sessions_test.go` | `f2a9597b85e672428f099e7473328711f49d4fd9f0874a3b8a7e233cc0562bb6` |
+| `cmd/scribe/wiki_actions_meta_test.go` | `190ff2387048ed043c743f94391840ff65c231b62257ec719b175a68dee8333f` |
+| `cmd/scribe/claude.go` | `32c4fe42f046ef385f904f05170f95d1b0d966d9b1973c001d29740091b2d859` |

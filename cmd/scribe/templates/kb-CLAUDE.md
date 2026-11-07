@@ -125,7 +125,7 @@ See `scribe --help` for the full command tree.
 10. **Rolling memory files** use `rolling: true` frontmatter and append-newest-first.
     Use `## YYYY-MM-DD | Title` headings and explicit `session:<id>` references when available. Preserve valid metadata and historical dates.
     Tools and envelope mining repair and validate changed rolling files before recording success. This includes standard/configured targets, yearly archives, and marked files in content directories. Unresolved output restores the session's rolling changes; failed restoration stops sync before commits.
-    Preview existing rolling metadata with `scribe lint --fix --rolling-only --dry-run`. It leaves content unchanged, reports unresolved files and takes the sync lock. Rolling-only apply is not available yet.
+    Preview existing rolling metadata with `scribe lint --fix --rolling-only --dry-run`; apply with `scribe lint --fix --rolling-only`. Both take the sync lock and report unresolved files with nonzero status. Apply validates each proposal before atomic replacement, preserves body/valid metadata and leaves unresolved files unchanged. Neither command performs duplicate cleanup.
 11. **Reality wins** — fix contradicted articles in place, don't carry both versions.
 12. **No knowledge deletion** — the KB is append-only; mark superseded, never delete.
 13. **Capture failure traces** — when a source shows what was tried and rejected (and why), or the conditions under which a solution breaks, record that alongside the fix. A reader avoiding a known dead end is often more valuable than the fix itself. This is a guideline: don't pad an article with a failure-trace section it doesn't need.

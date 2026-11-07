@@ -7,9 +7,12 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -17,6 +20,19 @@ import (
 func TestIssue2CLIProcessHelper(t *testing.T) {
 	if os.Getenv("ISSUE2_CLI_PROCESS") != "1" {
 		return
+	}
+	if value := os.Getenv("ISSUE2_CLI_FILE_LIMIT"); value != "" {
+		limit, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signal.Ignore(syscall.SIGXFSZ)
+		if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &syscall.Rlimit{Cur: limit, Max: limit}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if os.Getenv("ISSUE2_CLI_PRIVATE_UMASK") == "1" {
+		syscall.Umask(0o077)
 	}
 	for i, arg := range os.Args {
 		if arg == "--" {
@@ -30,6 +46,11 @@ func TestIssue2CLIProcessHelper(t *testing.T) {
 
 func issue2RunCLI(t *testing.T, root string, args ...string) (string, int) {
 	t.Helper()
+	return issue2RunCLIEnv(t, root, nil, args...)
+}
+
+func issue2RunCLIEnv(t *testing.T, root string, env []string, args ...string) (string, int) {
+	t.Helper()
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +61,7 @@ func issue2RunCLI(t *testing.T, root string, args ...string) (string, int) {
 	cmd := exec.CommandContext(ctx, exe, argv...)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "ISSUE2_CLI_PROCESS=1")
+	cmd.Env = append(cmd.Env, env...)
 	guard := t.TempDir()
 	for _, tool := range []string{"claude", "codex", "qmd", "ccrider"} {
 		if err := os.WriteFile(filepath.Join(guard, tool), []byte("#!/bin/sh\necho forbidden-external-tool >&2\nexit 97\n"), 0o755); err != nil {
@@ -247,7 +269,7 @@ func TestIssue2RollingPreviewHelpAndOrdinaryLint(t *testing.T) {
 	writeKBFile(t, root, "wiki/ordinary.md", "---\ntitle: Ordinary\ntype: project\n---\nPreserve preview whitespace.  \n")
 	before := issue2KBBytes(t, root)
 	out, exit := issue2RunCLI(t, root, "lint", "--help")
-	if exit != 0 || !strings.Contains(out, "--rolling-only") || !strings.Contains(out, "unresolved") || !strings.Contains(out, "Apply is not available yet") {
+	if exit != 0 || !strings.Contains(out, "--rolling-only") || !strings.Contains(out, "unresolved") || !strings.Contains(strings.Join(strings.Fields(out), " "), "--dry-run previews") {
 		t.Fatalf("rolling preview help is missing its boundary: exit=%d\n%s", exit, out)
 	}
 	out, exit = issue2RunCLI(t, root, "lint", "--fix", "--dry-run", "wiki/ordinary.md")
@@ -312,7 +334,6 @@ func TestIssue2RollingPreviewFlagsAndBusy(t *testing.T) {
 		message string
 	}{
 		{"requires-fix", []string{"--rolling-only", "--dry-run"}, "requires --fix"},
-		{"blocks-apply", []string{"--fix", "--rolling-only"}, "apply is not available"},
 		{"no-duplicate-scan", []string{"--fix", "--rolling-only", "--dry-run", "--duplicates"}, "cannot be combined"},
 		{"no-model-operation", []string{"--fix", "--rolling-only", "--dry-run", "--contradictions"}, "cannot be combined"},
 	} {
